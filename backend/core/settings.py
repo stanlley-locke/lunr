@@ -1,7 +1,7 @@
-# backend/core/settings.py
 import os
 from urllib.parse import urlparse
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv()
 
@@ -9,7 +9,18 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-for-dev')
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
-ALLOWED_HOSTS = ['*']  # Tighten in production
+
+# CODESPACES CONFIG: Allow all hosts because the URL changes dynamically
+ALLOWED_HOSTS = ['*'] 
+
+# CODESPACES CRITICAL FIX: Trust the GitHub domains for CSRF
+# Without this, login and POST requests will fail 403 Forbidden
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.app.github.dev',
+    'https://*.github.dev',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -59,6 +70,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
 # Database
+# For Codespaces, this will default to sqlite which is perfect
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3')
 if DATABASE_URL.startswith('sqlite'):
     DATABASES = {
@@ -99,7 +111,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS
-CORS_ALLOW_ALL_ORIGINS = True  # Update for production
+CORS_ALLOW_ALL_ORIGINS = True 
 
 # REST Framework
 REST_FRAMEWORK = {
@@ -116,21 +128,20 @@ REST_FRAMEWORK = {
     }
 }
 
-from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
 }
 
-REDIS_URL = os.getenv('REDISION_URL')
-
-# Channels
+# Channels Configuration for Codespaces
+# We assume you installed redis via `sudo apt-get install redis-server`
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.getenv("REDISION_URL", "redis://127.0.0.1:6379")],
+            # In Codespaces, Redis runs on localhost inside the container
+            "hosts": [("127.0.0.1", 6379)],
         },
     },
 }
