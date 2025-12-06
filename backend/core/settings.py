@@ -123,12 +123,14 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
 }
 
+REDIS_URL = os.getenv('REDISION_URL')
+
 # Channels
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.getenv("REDIS_URL", "redis://127.0.0.1:6379")],
+            "hosts": [os.getenv("REDISION_URL", "redis://127.0.0.1:6379")],
         },
     },
 }
