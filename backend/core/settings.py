@@ -21,7 +21,7 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
-    'channels',
+    #'channels',
     # Local
     'chat',
 ]
