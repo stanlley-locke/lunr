@@ -1,0 +1,6 @@
+# .gitignore for lunr/backend
+.env
+db.sqlite3
+staticfiles/
+__pycache__/
+*.pyc

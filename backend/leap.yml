@@ -1,0 +1,24 @@
+# backend/leap.yml
+version: "1"
+services:
+  web:
+    name: lunr-backend
+    image: ./
+    port: 8000
+    env:
+      # Required by Leapcell
+      - PORT=8000
+      # Security
+      - SECRET_KEY=${SECRET_KEY}
+      # Database (auto-injected if you link a Leapcell DB service)
+      - DATABASE_URL=${DATABASE_URL}
+      # Redis for WebSockets (auto-injected if you link a Redis service)
+      - REDISION_URL=${REDISION_URL}
+      # Production settings
+      - DEBUG=False
+      - ALLOWED_HOSTS=.leapcell.app,localhost
+    healthcheck: /api/health/
+    # Optional: scale for production
+    # resources:
+    #   cpu: "0.5"
+    #   memory: "512Mi"
