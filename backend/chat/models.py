@@ -78,8 +78,8 @@ class Message(models.Model):
     thumbnail_url = models.URLField(blank=True)
     
     # Message features
-    reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE)
-    forwarded_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
+    reply_to = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies')
+    forwarded_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='forwards')
     
     # Timestamps
     timestamp = models.DateTimeField(auto_now_add=True)

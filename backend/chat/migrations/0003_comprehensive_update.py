@@ -149,12 +149,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='message',
             name='reply_to',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='chat.message'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='replies', to='chat.message'),
         ),
         migrations.AddField(
             model_name='message',
             name='forwarded_from',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='forwarded_messages', to='chat.message'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='forwards', to='chat.message'),
         ),
         migrations.AddField(
             model_name='message',
