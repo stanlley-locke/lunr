@@ -17,6 +17,8 @@ from .serializers import (
     ToolSerializer, UserBlockSerializer, UserReportSerializer, UserProfileSerializer
 )
 import socketio
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 
 # Authentication Views
 @api_view(['POST'])
@@ -203,6 +205,40 @@ def send_message(request):
     
     message_data = {
         'sender': request.user,
+        'room': room,
+        'content': content,
+        'message_type': message_type
+    }
+    
+    if reply_to_id:
+        reply_message = get_object_or_404(Message, id=reply_to_id, room=room)
+        message_data['reply_to'] = reply_message
+    
+    message = Message.objects.create(**message_data)
+    room.updated_at = timezone.now()
+    room.save()
+    
+    # Emit to Socket.IO
+    try:
+        # Connect to the same Redis as the server
+        mgr = socketio.RedisManager('redis://127.0.0.1:6379/0', write_only=True)
+        serializer = MessageSerializer(message)
+        # Serialize data to ensure UUIDs/Datetimes are handled
+        data = json.loads(json.dumps(serializer.data, cls=DjangoJSONEncoder))
+        mgr.emit('message', data, room=str(room.id))
+    except Exception as e:
+        print(f"Socket emit error: {e}")
+    
+    return Response(MessageSerializer(message).data, status=201)
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def message_detail(request, message_id):
+    message = get_object_or_404(Message, id=message_id, sender=request.user)
+    
+    if request.method == 'PUT':
+        content = request.data.get('content')
+        if content:
             message.content = content
             message.edited_at = timezone.now()
             message.save()
