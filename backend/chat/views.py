@@ -102,6 +102,43 @@ def search_users(request):
 @permission_classes([IsAuthenticated])
 def chat_rooms(request):
     if request.method == 'GET':
+        rooms = ChatRoom.objects.filter(
+            members=request.user
+        ).prefetch_related('members', 'messages').order_by('-updated_at')
+        serializer = ChatRoomSerializer(rooms, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        data = request.data
+        room_type = data.get('room_type', 'group')
+        
+        if room_type == 'direct':
+            other_user_id = data.get('other_user_id')
+            if not other_user_id:
+                return Response({'error': 'other_user_id required for direct chat'}, status=400)
+            
+            # Check if direct room already exists
+            existing_room = ChatRoom.objects.filter(
+                room_type='direct',
+                members=request.user
+            ).filter(
+                members=other_user_id
+            ).first()
+            
+            if existing_room:
+                return Response(ChatRoomSerializer(existing_room).data)
+            
+            # Create new direct room
+            room = ChatRoom.objects.create(
+                room_type='direct',
+                created_by=request.user
+            )
+            RoomMembership.objects.create(user=request.user, room=room, role='admin')
+            RoomMembership.objects.create(user_id=other_user_id, room=room, role='member')
+        
+        else:
+            # Create group room
+            room = ChatRoom.objects.create(
                 name=data.get('name', ''),
                 description=data.get('description', ''),
                 room_type='group',
