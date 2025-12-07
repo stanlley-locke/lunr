@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import '../models/chat_room.dart';
+import '../models/message.dart';
+import '../models/user_settings.dart';
 
 class ApiService {
-  // Use your Codespace URL
   static const String _baseUrl = 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev/api';
 
+  // Authentication
   Future<User?> register(String username, String password) async {
     try {
       final response = await http.post(
@@ -41,10 +44,59 @@ class ApiService {
     }
   }
 
-  Future<List<User>> getConversations(String token) async {
+  Future<bool> logout(String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/logout/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Profile
+  Future<User?> getProfile(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/conversations/'),
+        Uri.parse('$_baseUrl/profile/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        return User.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<User?> updateProfile(String token, Map<String, dynamic> data) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/profile/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode(data),
+      );
+      
+      if (response.statusCode == 200) {
+        return User.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<List<User>> searchUsers(String token, String query) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/users/search/?q=$query'),
         headers: {'Authorization': 'Bearer $token'},
       );
       
@@ -58,10 +110,168 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getMessages(String token, int userId) async {
+  // Chat Rooms
+  Future<List<ChatRoom>> getChatRooms(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/messages/$userId/'),
+        Uri.parse('$_baseUrl/rooms/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => ChatRoom.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<ChatRoom?> createChatRoom(String token, Map<String, dynamic> data) async {
+    try {
+      print('Creating room with data: ${jsonEncode(data)}');
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode(data),
+      );
+      
+      print('Room creation response: ${response.statusCode} - ${response.body}');
+      
+      if (response.statusCode == 201) {
+        return ChatRoom.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      print('Room creation error: $e');
+      return null;
+    }
+  }
+
+  // Messages
+  Future<List<Message>> getRoomMessages(String token, String roomId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/rooms/$roomId/messages/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Message.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Message?> sendMessage(String token, String roomId, String content, {String? replyTo}) async {
+    try {
+      final data = {
+        'room_id': roomId,
+        'content': content,
+        'message_type': 'text',
+      };
+      if (replyTo != null) data['reply_to'] = replyTo;
+      
+      final response = await http.post(
+        Uri.parse('$_baseUrl/messages/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode(data),
+      );
+      
+      if (response.statusCode == 201) {
+        return Message.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> addReaction(String token, String messageId, String emoji) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/messages/$messageId/react/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'emoji': emoji}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Settings
+  Future<UserSettings?> getSettings(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/settings/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        return UserSettings.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<UserSettings?> updateSettings(String token, UserSettings settings) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/settings/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode(settings.toJson()),
+      );
+      
+      if (response.statusCode == 200) {
+        return UserSettings.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Privacy
+  Future<bool> blockUser(String token, int userId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/privacy/block/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'user_id': userId}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // App Features
+  Future<List<dynamic>> getUpdates(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/updates/'),
         headers: {'Authorization': 'Bearer $token'},
       );
       
@@ -74,22 +284,19 @@ class ApiService {
     }
   }
 
-  Future<bool> sendMessage(String token, int receiverId, String content) async {
+  Future<List<dynamic>> getTools(String token) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/messages/'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json'
-        },
-        body: jsonEncode({
-          'receiver_id': receiverId,
-          'content': content
-        }),
+      final response = await http.get(
+        Uri.parse('$_baseUrl/tools/'),
+        headers: {'Authorization': 'Bearer $token'},
       );
-      return response.statusCode == 201;
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
     } catch (e) {
-      return false;
+      return [];
     }
   }
 }

@@ -6,13 +6,13 @@ import '../services/api_service.dart';
 import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
-  final int contactId;
-  final String contactName;
+  final String roomId;
+  final String roomName;
 
   const ChatScreen({
     Key? key,
-    required this.contactId,
-    required this.contactName,
+    required this.roomId,
+    required this.roomName,
   }) : super(key: key);
 
   @override
@@ -54,15 +54,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMessages() async {
     final token = await _authService.getToken();
     if (token != null) {
-      final messages = await _apiService.getMessages(token, widget.contactId);
+      final messages = await _apiService.getRoomMessages(token, widget.roomId);
       final parsedMessages = messages
-          .map((msg) => Message.fromJson(msg))
-          .toList()
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
       
       if (mounted) {
         setState(() {
-          _messages = parsedMessages;
+          _messages = messages;
           _isLoading = false;
         });
         
@@ -92,13 +90,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final token = await _authService.getToken();
     
     if (token != null) {
-      final success = await _apiService.sendMessage(
+      final message = await _apiService.sendMessage(
         token,
-        widget.contactId,
+        widget.roomId,
         messageText,
       );
       
-      if (success && mounted) {
+      if (message != null && mounted) {
         _messageController.clear();
         _loadMessages(); // Refresh immediately
       }
@@ -110,7 +108,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.contactName)),
+      appBar: AppBar(title: Text(widget.roomName)),
       body: Column(
         children: [
           Expanded(
@@ -124,7 +122,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final message = _messages.reversed.toList()[index];
-                          final isOwn = message.senderId == _currentUserId;
+                          final isOwn = message.sender.id == _currentUserId;
                           return Container(
                             padding: EdgeInsets.all(8),
                             alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
