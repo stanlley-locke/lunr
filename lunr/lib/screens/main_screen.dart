@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import 'chat_list_screen.dart';
@@ -6,6 +7,7 @@ import 'groups_screen.dart';
 import 'updates_screen.dart';
 import 'tools_screen.dart';
 import 'settings_screen.dart';
+import 'profile_settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -14,14 +16,24 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
-  final List<Widget> _screens = [
-    ChatListScreen(),
-    GroupsScreen(),
-    UpdatesScreen(),
-    ToolsScreen(),
-    SettingsScreen(),
-  ];
+  late List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      ChatListScreen(onMenuPressed: _openDrawer),
+      GroupsScreen(onMenuPressed: _openDrawer),
+      UpdatesScreen(onMenuPressed: _openDrawer),
+      ToolsScreen(onMenuPressed: _openDrawer),
+    ];
+  }
+
+  void _openDrawer() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
 
   final List<Map<String, dynamic>> _navItems = [
     {
@@ -40,79 +52,135 @@ class _MainScreenState extends State<MainScreen> {
       'icon': 'assets/icons/lunr_tools_icon.png',
       'label': 'Tools',
     },
-    {
-      'icon': 'assets/icons/lunr_settings_icon.png',
-      'label': 'Settings',
-    },
   ];
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: _buildDrawer(context, theme),
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: themeProvider.cardColor,
+          color: theme.cardColor,
           boxShadow: [
             BoxShadow(
-              color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 20,
-              offset: Offset(0, -8),
+              offset: Offset(0, -5),
             ),
           ],
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          child: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: Color(0xFF2196F3),
-            unselectedItemColor: themeProvider.subtitleColor,
-            backgroundColor: themeProvider.cardColor,
-            elevation: 0,
-            selectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-            unselectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 12,
-            ),
-            items: List.generate(_navItems.length, (index) {
-              final item = _navItems[index];
-              return BottomNavigationBarItem(
-                icon: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: index == _currentIndex 
-                        ? Color(0xFF2196F3).withOpacity(0.1)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(_navItems.length, (index) {
+                final isSelected = _currentIndex == index;
+                final item = _navItems[index];
+                
+                return InkWell(
+                  onTap: () => setState(() => _currentIndex = index),
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: Duration(milliseconds: 200),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? theme.primaryColor.withOpacity(0.1) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          item['icon'],
+                          width: 24,
+                          height: 24,
+                          // color: isSelected ? theme.primaryColor : theme.iconTheme.color?.withOpacity(0.5), // Removed to preserve 3D effect
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          item['label'],
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            color: isSelected ? theme.primaryColor : theme.iconTheme.color?.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Image.asset(
-                    item['icon'],
-                    width: 24,
-                    height: 24,
-                    color: index == _currentIndex 
-                        ? Color(0xFF2196F3)
-                        : themeProvider.subtitleColor,
-                  ),
-                ),
-                label: item['label'],
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, ThemeData theme) {
+    return Drawer(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/icons/lunr_app_icon.png',
+                    width: 60,
+                    height: 60,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Lunr',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ListTile(
+            leading: Image.asset('assets/icons/lunr_profile_icon.png', width: 24),
+            title: Text('Profile', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileSettingsScreen()));
+            },
+          ),
+          ListTile(
+            leading: Image.asset('assets/icons/lunr_settings_icon.png', width: 24),
+            title: Text('Settings', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsScreen()));
+            },
+          ),
+          Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Version 1.0.0',
+              style: GoogleFonts.inter(color: Colors.grey),
+            ),
+          ),
+        ],
       ),
     );
   }

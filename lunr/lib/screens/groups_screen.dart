@@ -1,368 +1,389 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/theme_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import '../widgets/custom_app_bar.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../models/chat_room.dart';
+import 'chat_screen.dart';
 
 class GroupsScreen extends StatefulWidget {
+  final VoidCallback? onMenuPressed;
+
+  const GroupsScreen({Key? key, this.onMenuPressed}) : super(key: key);
+
   @override
   _GroupsScreenState createState() => _GroupsScreenState();
 }
 
 class _GroupsScreenState extends State<GroupsScreen> {
-  final List<Map<String, dynamic>> _groups = [
-    {
-      'name': 'Flutter Developers',
-      'members': 24,
-      'lastMessage': 'John: Check out this new package!',
-      'time': '2:30 PM',
-      'unread': 3,
-    },
-    {
-      'name': 'Design Team',
-      'members': 8,
-      'lastMessage': 'Sarah: New mockups are ready',
-      'time': '1:15 PM',
-      'unread': 0,
-    },
-    {
-      'name': 'Project Alpha',
-      'members': 12,
-      'lastMessage': 'Mike: Meeting at 3 PM',
-      'time': '11:45 AM',
-      'unread': 1,
-    },
-  ];
+  List<ChatRoom> _groups = [];
+  bool _isLoading = true;
+  final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      final rooms = await _apiService.getChatRooms(token);
+      if (mounted) {
+        setState(() {
+          _groups = rooms.where((room) => room.isGroup).toList();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: themeProvider.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: themeProvider.backgroundColor,
-        elevation: 8,
-        shadowColor: themeProvider.isDarkMode ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.1),
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/icons/lunr_group_icon.png',
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: CustomAppBar(
+        title: 'Groups',
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Image.asset(
+              'assets/icons/lunr_humburger_icon.png',
               width: 24,
               height: 24,
+              // color: theme.iconTheme.color, // Removed to preserve 3D effect
             ),
-            SizedBox(width: 8),
-            Text(
-              'Groups',
-              style: TextStyle(
-                color: themeProvider.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+            onPressed: widget.onMenuPressed,
+          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.add,
-              color: themeProvider.textColor,
+            icon: Image.asset(
+              'assets/icons/lunr_plus_icon.png',
+              width: 24,
+              height: 24,
+              // color: theme.iconTheme.color, // Removed to preserve 3D effect
             ),
-            onPressed: () {
-              _showCreateGroupDialog();
-            },
+            onPressed: _showCreateGroupDialog,
           ),
         ],
       ),
       body: Column(
         children: [
           // Search Bar
-          Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: themeProvider.searchBarColor,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search groups...',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.search, color: themeProvider.subtitleColor),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Search groups...',
-                    style: TextStyle(
-                      color: themeProvider.subtitleColor,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
+                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
             ),
           ),
           
           // Groups List
           Expanded(
-            child: _groups.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    itemCount: _groups.length,
-                    itemBuilder: (context, index) {
-                      final group = _groups[index];
-                      return _buildGroupTile(group);
-                    },
-                  ),
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : _groups.isEmpty
+                    ? _buildEmptyState(theme)
+                    : GridView.builder(
+                        padding: EdgeInsets.all(16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.85,
+                        ),
+                        itemCount: _groups.length,
+                        itemBuilder: (context, index) {
+                          final group = _groups[index];
+                          return _buildGroupCard(group, theme);
+                        },
+                      ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Color(0xFF2196F3),
-        child: Icon(
-          Icons.add,
-          color: Colors.white,
-        ),
-        onPressed: () {
-          _showCreateGroupDialog();
-        },
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+  Widget _buildEmptyState(ThemeData theme) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: themeProvider.cardColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
-                ),
-              ],
+              color: theme.cardColor,
+              shape: BoxShape.circle,
             ),
             child: Image.asset(
               'assets/icons/lunr_group_icon.png',
-              width: 80,
-              height: 80,
-              color: themeProvider.subtitleColor,
+              width: 64,
+              height: 64,
+              // color: theme.disabledColor, // Removed to preserve 3D effect
             ),
           ),
           SizedBox(height: 24),
           Text(
             'No Groups Yet',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: themeProvider.textColor,
-            ),
+            style: theme.textTheme.titleLarge,
           ),
           SizedBox(height: 8),
           Text(
             'Create or join groups to start chatting',
-            style: TextStyle(
-              color: themeProvider.subtitleColor,
-            ),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGroupTile(Map<String, dynamic> group) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+  Widget _buildGroupCard(ChatRoom group, ThemeData theme) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: themeProvider.cardColor,
-        borderRadius: BorderRadius.circular(16),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Container(
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Color(0xFF2196F3),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0xFF2196F3).withOpacity(0.3),
-                blurRadius: 8,
-                offset: Offset(0, 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  roomId: group.id,
+                  roomName: group.displayName,
+                ),
               ),
-            ],
-          ),
-          child: Image.asset(
-            'assets/icons/lunr_group_icon.png',
-            width: 24,
-            height: 24,
-            color: Colors.white,
-          ),
-        ),
-        title: Text(
-          group['name'],
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: themeProvider.textColor,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 4),
-            Text(
-              '${group['members']} members',
-              style: TextStyle(
-                color: themeProvider.subtitleColor,
-                fontSize: 12,
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              group['lastMessage'],
-              style: TextStyle(
-                color: themeProvider.subtitleColor,
-                fontSize: 14,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              group['time'],
-              style: TextStyle(
-                color: themeProvider.subtitleColor,
-                fontSize: 12,
-              ),
-            ),
-            if (group['unread'] > 0) ...[
-              SizedBox(height: 6),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Color(0xFF2196F3),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0xFF2196F3).withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
+            );
+          },
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Image.asset(
+                        'assets/icons/lunr_group_icon.png',
+                        width: 24,
+                        height: 24,
+                        color: theme.primaryColor,
+                      ),
                     ),
+                    // Unread count placeholder or real data if available
+                    /*
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '0',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    */
                   ],
                 ),
-                child: Text(
-                  '${group['unread']}',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
+                Spacer(),
+                Text(
+                  group.displayName,
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: theme.textTheme.bodyLarge?.color,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '${group.memberCount} members',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: theme.disabledColor,
                   ),
                 ),
-              ),
-            ],
-          ],
+                SizedBox(height: 8),
+                Text(
+                  group.lastMessage?.content ?? 'No messages yet',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
         ),
-        onTap: () {
-          // Navigate to group chat
-        },
       ),
     );
   }
 
   void _showCreateGroupDialog() {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final theme = Theme.of(context);
+    final _groupNameController = TextEditingController();
+    bool _isCreating = false;
+    
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: themeProvider.cardColor,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: theme.cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            'Create Group',
-            style: TextStyle(color: themeProvider.textColor),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                style: TextStyle(color: themeProvider.textColor),
-                decoration: InputDecoration(
-                  labelText: 'Group Name',
-                  labelStyle: TextStyle(color: themeProvider.subtitleColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Color(0xFF2196F3)),
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Create New Group',
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.textTheme.bodyLarge?.color,
                   ),
                 ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                style: TextStyle(color: themeProvider.textColor),
-                decoration: InputDecoration(
-                  labelText: 'Description (Optional)',
-                  labelStyle: TextStyle(color: themeProvider.subtitleColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Color(0xFF2196F3)),
+                SizedBox(height: 24),
+                TextField(
+                  controller: _groupNameController,
+                  style: GoogleFonts.inter(color: theme.textTheme.bodyLarge?.color),
+                  decoration: InputDecoration(
+                    labelText: 'Group Name',
+                    labelStyle: GoogleFonts.inter(color: theme.disabledColor),
+                    hintText: 'Enter group name',
+                    hintStyle: GoogleFonts.inter(color: theme.disabledColor.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.group_outlined, color: theme.primaryColor),
+                    filled: true,
+                    fillColor: theme.scaffoldBackgroundColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.primaryColor, width: 1),
+                    ),
                   ),
                 ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: themeProvider.subtitleColor),
-              ),
+                SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.inter(
+                          color: theme.disabledColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: _isCreating ? null : () async {
+                        if (_groupNameController.text.isNotEmpty) {
+                          setState(() => _isCreating = true);
+                          
+                          final token = await _authService.getToken();
+                          if (token != null) {
+                            final roomData = {
+                              'name': _groupNameController.text,
+                              'room_type': 'group',
+                              // Add current user as member automatically by backend or here if needed
+                            };
+                            
+                            final room = await _apiService.createChatRoom(token, roomData);
+                            
+                            if (mounted) {
+                              setState(() => _isCreating = false);
+                              Navigator.pop(context);
+                              if (room != null) {
+                                _loadGroups(); // Refresh list
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to create group')),
+                                );
+                              }
+                            }
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primaryColor,
+                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isCreating
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Create',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Create group logic
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF2196F3),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text('Create'),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+      ),
     );
   }
 }
