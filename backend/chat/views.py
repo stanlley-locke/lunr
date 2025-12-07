@@ -203,20 +203,6 @@ def send_message(request):
     
     message_data = {
         'sender': request.user,
-        'room': room,
-        'content': content,
-        'message_type': message_type
-    }
-    
-    if reply_to_id:
-        reply_message = get_object_or_404(Message, id=reply_to_id, room=room)
-        message_data['reply_to'] = reply_message
-def message_detail(request, message_id):
-    message = get_object_or_404(Message, id=message_id, sender=request.user)
-    
-    if request.method == 'PUT':
-        content = request.data.get('content')
-        if content:
             message.content = content
             message.edited_at = timezone.now()
             message.save()
