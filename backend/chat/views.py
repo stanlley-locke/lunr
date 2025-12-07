@@ -102,23 +102,6 @@ def search_users(request):
 @permission_classes([IsAuthenticated])
 def chat_rooms(request):
     if request.method == 'GET':
-        rooms = ChatRoom.objects.filter(
-            members=request.user
-        ).prefetch_related('members', 'messages').order_by('-updated_at')
-        serializer = ChatRoomSerializer(rooms, many=True)
-        return Response(serializer.data)
-    
-    elif request.method == 'POST':
-        data = request.data
-        room_type = data.get('room_type', 'group')
-                created_by=request.user
-            )
-            RoomMembership.objects.create(user=request.user, room=room, role='admin')
-            RoomMembership.objects.create(user_id=other_user_id, room=room, role='member')
-        
-        else:
-            # Create group room
-            room = ChatRoom.objects.create(
                 name=data.get('name', ''),
                 description=data.get('description', ''),
                 room_type='group',
