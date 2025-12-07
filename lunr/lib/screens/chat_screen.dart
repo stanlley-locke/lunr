@@ -31,6 +31,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final ApiService _apiService = ApiService();
   final SocketService _socketService = SocketService();
 
+  // Selection Mode
+  Set<String> _selectedMessageIds = {};
+  bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -126,10 +130,71 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => _isSending = false);
   }
 
+  void _toggleSelection(String messageId) {
+    setState(() {
+      if (_selectedMessageIds.contains(messageId)) {
+        _selectedMessageIds.remove(messageId);
+      } else {
+        _selectedMessageIds.add(messageId);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedMessageIds.clear();
+    });
+  }
+
+  Future<void> _deleteSelectedMessages() async {
+    final token = await _authService.getToken();
+    if (token == null) return;
+
+    bool confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Messages?'),
+        content: Text('Are you sure you want to delete ${_selectedMessageIds.length} selected messages?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirm) return;
+
+    setState(() => _isLoading = true);
+
+    for (var messageId in _selectedMessageIds) {
+      await _apiService.deleteMessage(token, messageId);
+    }
+
+    _clearSelection();
+    _loadMessages(); // Reload to reflect deletions
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.roomName)),
+      appBar: _isSelectionMode
+        ? AppBar(
+            title: Text('${_selectedMessageIds.length} Selected'),
+            leading: IconButton(
+              icon: Icon(Icons.close),
+              onPressed: _clearSelection,
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: _deleteSelectedMessages,
+              ),
+            ],
+          )
+        : AppBar(title: Text(widget.roomName)),
       body: Column(
         children: [
           Expanded(
@@ -143,19 +208,32 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemBuilder: (context, index) {
                           final message = _messages[index];
                           final isOwn = message.sender.id == _currentUserId;
-                          return Container(
-                            padding: EdgeInsets.all(8),
-                            alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+                          final isSelected = _selectedMessageIds.contains(message.id);
+                          
+                          return GestureDetector(
+                            onLongPress: () {
+                              if (isOwn) _toggleSelection(message.id);
+                            },
+                            onTap: () {
+                              if (_isSelectionMode && isOwn) {
+                                _toggleSelection(message.id);
+                              }
+                            },
                             child: Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isOwn ? Colors.blue : Colors.grey[300],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                message.content,
-                                style: TextStyle(
-                                  color: isOwn ? Colors.white : Colors.black,
+                              color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                              padding: EdgeInsets.all(8),
+                              alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isOwn ? Colors.blue : Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  message.content,
+                                  style: TextStyle(
+                                    color: isOwn ? Colors.white : Colors.black,
+                                  ),
                                 ),
                               ),
                             ),
@@ -163,30 +241,31 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Type a message...',
-                      border: OutlineInputBorder(),
+          if (!_isSelectionMode)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
                   ),
-                ),
-                SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isSending ? null : _sendMessage,
-                  child: _isSending 
-                      ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-                      : Icon(Icons.send, size: 20),
-                ),
-              ],
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _isSending ? null : _sendMessage,
+                    child: _isSending 
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                        : Icon(Icons.send, size: 20),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

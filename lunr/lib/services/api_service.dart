@@ -152,6 +152,18 @@ class ApiService {
     }
   }
 
+  Future<bool> deleteChatRoom(String token, String roomId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/rooms/$roomId/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Messages
   Future<List<Message>> getRoomMessages(String token, String roomId) async {
     try {
@@ -194,6 +206,18 @@ class ApiService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  Future<bool> deleteMessage(String token, String messageId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/messages/$messageId/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 

@@ -28,6 +28,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final ApiService _apiService = ApiService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  
+  // Selection Mode
+  Set<String> _selectedRoomIds = {};
+  bool get _isSelectionMode => _selectedRoomIds.isNotEmpty;
 
   @override
   void initState() {
@@ -74,54 +78,115 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
+  void _toggleSelection(String roomId) {
+    setState(() {
+      if (_selectedRoomIds.contains(roomId)) {
+        _selectedRoomIds.remove(roomId);
+      } else {
+        _selectedRoomIds.add(roomId);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedRoomIds.clear();
+    });
+  }
+
+  Future<void> _deleteSelectedRooms() async {
+    final token = await _authService.getToken();
+    if (token == null) return;
+
+    bool confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Chats?'),
+        content: Text('Are you sure you want to delete ${_selectedRoomIds.length} selected chats?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirm) return;
+
+    setState(() => _isLoading = true);
+
+    for (var roomId in _selectedRoomIds) {
+      await _apiService.deleteChatRoom(token, roomId);
+    }
+
+    _clearSelection();
+    _loadContacts();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(
-        title: 'Chats',
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Image.asset(
-              'assets/icons/lunr_humburger_icon.png',
-              width: 24,
-              height: 24,
-              // color: theme.iconTheme.color, // Removed to preserve 3D effect
+      appBar: _isSelectionMode
+        ? CustomAppBar(
+            title: '${_selectedRoomIds.length} Selected',
+            leading: IconButton(
+              icon: Icon(Icons.close, color: theme.iconTheme.color),
+              onPressed: _clearSelection,
             ),
-            onPressed: widget.onMenuPressed,
+            actions: [
+              IconButton(
+                icon: Icon(Icons.delete, color: Colors.red),
+                onPressed: _deleteSelectedRooms,
+              ),
+            ],
+          )
+        : CustomAppBar(
+            title: 'Chats',
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: Image.asset(
+                  'assets/icons/lunr_humburger_icon.png',
+                  width: 24,
+                  height: 24,
+                ),
+                onPressed: widget.onMenuPressed,
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.search, color: theme.iconTheme.color),
+                onPressed: () {
+                  // Expand search bar
+                },
+              ),
+            ],
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search, color: theme.iconTheme.color),
-            onPressed: () {
-              // Expand search bar
-            },
-          ),
-        ],
-      ),
       body: Column(
         children: [
           // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search chats...',
-                prefixIcon: Icon(Icons.search),
-                filled: true,
-                fillColor: theme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+          if (!_isSelectionMode)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search chats...',
+                  prefixIcon: Icon(Icons.search),
+                  filled: true,
+                  fillColor: theme.cardColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
             ),
-          ),
           
           // Chat List
           Expanded(
@@ -135,13 +200,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         separatorBuilder: (context, index) => SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final room = _filteredRooms[index];
-                          return _buildChatTile(room, theme);
+                          final isSelected = _selectedRoomIds.contains(room.id);
+                          return _buildChatTile(room, theme, isSelected);
                         },
                       ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: !_isSelectionMode ? FloatingActionButton(
         backgroundColor: theme.primaryColor,
         child: Image.asset(
           'assets/icons/lunr_plus_icon.png',
@@ -150,7 +216,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           color: Colors.white,
         ),
         onPressed: _showNewChatDialog,
-      ),
+      ) : null,
     );
   }
 
@@ -169,7 +235,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
               'assets/icons/lunr_chats_icon.png',
               width: 64,
               height: 64,
-              // color: theme.disabledColor, // Removed to preserve 3D effect
             ),
           ),
           SizedBox(height: 24),
@@ -187,11 +252,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildChatTile(ChatRoom room, ThemeData theme) {
+  Widget _buildChatTile(ChatRoom room, ThemeData theme, bool isSelected) {
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: isSelected ? theme.primaryColor.withOpacity(0.1) : theme.cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: isSelected ? Border.all(color: theme.primaryColor, width: 2) : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -204,32 +270,53 @@ class _ChatListScreenState extends State<ChatListScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
+          onLongPress: () {
+            _toggleSelection(room.id);
+          },
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatScreen(
-                  roomId: room.id,
-                  roomName: room.displayName,
+            if (_isSelectionMode) {
+              _toggleSelection(room.id);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatScreen(
+                    roomId: room.id,
+                    roomName: room.displayName,
+                  ),
                 ),
-              ),
-            );
+              ).then((_) => _loadContacts());
+            }
           },
           child: Padding(
             padding: EdgeInsets.all(16),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: theme.primaryColor.withOpacity(0.1),
-                  child: Text(
-                    room.displayName.isNotEmpty ? room.displayName[0].toUpperCase() : '?',
-                    style: GoogleFonts.outfit(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: theme.primaryColor.withOpacity(0.1),
+                      child: Text(
+                        room.displayName.isNotEmpty ? room.displayName[0].toUpperCase() : '?',
+                        style: GoogleFonts.outfit(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: theme.primaryColor,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (isSelected)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: CircleAvatar(
+                          radius: 10,
+                          backgroundColor: theme.primaryColor,
+                          child: Icon(Icons.check, size: 12, color: Colors.white),
+                        ),
+                      ),
+                  ],
                 ),
                 SizedBox(width: 16),
                 Expanded(
