@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
 import '../models/chat_room.dart';
+import '../widgets/custom_app_bar.dart';
 import 'login_screen.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
+  final VoidCallback? onMenuPressed;
+
+  const ChatListScreen({Key? key, this.onMenuPressed}) : super(key: key);
+
   @override
   _ChatListScreenState createState() => _ChatListScreenState();
 }
@@ -57,50 +64,40 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final token = await _authService.getToken();
     if (token != null) {
       final rooms = await _apiService.getChatRooms(token);
-      setState(() {
-        _rooms = rooms;
-        _filteredRooms = List.from(rooms);
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _rooms = rooms;
+          _filteredRooms = List.from(rooms);
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: themeProvider.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: themeProvider.backgroundColor,
-        elevation: 8,
-        shadowColor: themeProvider.isDarkMode ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.1),
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/icons/lunr_chats_icon.png',
-              width: 24,
-              height: 24,
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Chats',
-              style: TextStyle(
-                color: themeProvider.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: CustomAppBar(
+        title: 'Chats',
+        leading: Builder(
+          builder: (context) => IconButton(
             icon: Image.asset(
               'assets/icons/lunr_humburger_icon.png',
               width: 24,
               height: 24,
+              // color: theme.iconTheme.color, // Removed to preserve 3D effect
             ),
+            onPressed: widget.onMenuPressed,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.search, color: theme.iconTheme.color),
             onPressed: () {
-              _showMenuBottomSheet(context);
+              // Expand search bar
             },
           ),
         ],
@@ -108,46 +105,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: Column(
         children: [
           // Search Bar
-          Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: themeProvider.searchBarColor,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search chats...',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.search, color: themeProvider.subtitleColor),
-                SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: themeProvider.textColor),
-                    decoration: InputDecoration(
-                      hintText: 'Search chats...',
-                      hintStyle: TextStyle(
-                        color: themeProvider.subtitleColor,
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                if (_searchQuery.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                    },
-                    child: Icon(Icons.clear, color: themeProvider.subtitleColor),
-                  ),
-              ],
+                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
             ),
           ),
           
@@ -156,270 +128,171 @@ class _ChatListScreenState extends State<ChatListScreen> {
             child: _isLoading
                 ? Center(child: CircularProgressIndicator())
                 : _filteredRooms.isEmpty
-                    ? _searchQuery.isNotEmpty
-                        ? _buildNoSearchResults()
-                        : _buildEmptyState()
-                    : ListView.builder(
+                    ? _buildEmptyState(theme)
+                    : ListView.separated(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
                         itemCount: _filteredRooms.length,
+                        separatorBuilder: (context, index) => SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final room = _filteredRooms[index];
-                          return _buildChatTile(room);
+                          return _buildChatTile(room, theme);
                         },
                       ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Color(0xFF2196F3),
+        backgroundColor: theme.primaryColor,
         child: Image.asset(
           'assets/icons/lunr_plus_icon.png',
           width: 24,
           height: 24,
           color: Colors.white,
         ),
-        onPressed: () {
-          _showNewChatDialog();
-        },
+        onPressed: _showNewChatDialog,
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+  Widget _buildEmptyState(ThemeData theme) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: themeProvider.cardColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
-                ),
-              ],
+              color: theme.cardColor,
+              shape: BoxShape.circle,
             ),
             child: Image.asset(
               'assets/icons/lunr_chats_icon.png',
-              width: 80,
-              height: 80,
-              color: themeProvider.subtitleColor,
+              width: 64,
+              height: 64,
+              // color: theme.disabledColor, // Removed to preserve 3D effect
             ),
           ),
           SizedBox(height: 24),
           Text(
             'No chats yet',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: themeProvider.textColor,
-            ),
+            style: theme.textTheme.titleLarge,
           ),
           SizedBox(height: 8),
           Text(
             'Start a conversation with someone',
-            style: TextStyle(
-              color: themeProvider.subtitleColor,
-            ),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildChatTile(ChatRoom room) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+  Widget _buildChatTile(ChatRoom room, ThemeData theme) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: themeProvider.cardColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Container(
-          padding: EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Color(0xFF2196F3),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0xFF2196F3).withOpacity(0.3),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.transparent,
-            child: Text(
-              room.displayName[0].toUpperCase(),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        title: Text(
-          room.displayName,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: themeProvider.textColor,
-          ),
-        ),
-        subtitle: Text(
-          room.lastMessage?.content ?? 'No messages yet',
-          style: TextStyle(
-            color: themeProvider.subtitleColor,
-            fontSize: 14,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '12:30 PM',
-              style: TextStyle(
-                color: themeProvider.subtitleColor,
-                fontSize: 12,
-              ),
-            ),
-            SizedBox(height: 6),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Color(0xFF2196F3),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0xFF2196F3).withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Text(
-                '2',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  roomId: room.id,
+                  roomName: room.displayName,
                 ),
               ),
+            );
+          },
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: theme.primaryColor.withOpacity(0.1),
+                  child: Text(
+                    room.displayName.isNotEmpty ? room.displayName[0].toUpperCase() : '?',
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              room.displayName,
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: theme.textTheme.bodyLarge?.color,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            room.lastMessage != null 
+                              ? DateFormat('h:mm a').format(room.lastMessage!.timestamp.toLocal())
+                              : '',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: theme.disabledColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              room.lastMessage?.content ?? 'No messages yet',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: theme.textTheme.bodyMedium?.color,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatScreen(
-                roomId: room.id,
-                roomName: room.displayName,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildNoSearchResults() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 80,
-            color: themeProvider.subtitleColor,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No chats found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: themeProvider.textColor,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Try searching with different keywords',
-            style: TextStyle(
-              color: themeProvider.subtitleColor,
-            ),
-          ),
-        ],
       ),
     );
   }
 
   void _showNewChatDialog() {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (context) => _NewChatDialog(),
-    );
-  }
-
-  void _showMenuBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Image.asset('assets/icons/lunr_profile_icon.png', width: 24),
-                title: Text('Profile'),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: Image.asset('assets/icons/lunr_settings_icon.png', width: 24),
-                title: Text('Settings'),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Logout', style: TextStyle(color: Colors.red)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _authService.logout();
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => LoginScreen()),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -453,17 +326,18 @@ class _NewChatDialogState extends State<_NewChatDialog> {
     final token = await _authService.getToken();
     if (token != null) {
       final results = await _apiService.searchUsers(token, _searchQuery);
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
     }
   }
 
   void _createChat(User user) async {
     final token = await _authService.getToken();
     if (token != null) {
-      // Try different data formats that the backend might expect
       final roomData = {
         'name': user.username,
         'room_type': 'direct',
@@ -472,7 +346,6 @@ class _NewChatDialogState extends State<_NewChatDialog> {
       
       var room = await _apiService.createChatRoom(token, roomData);
       
-      // If first format fails, try alternative format
       if (room == null) {
         final altRoomData = {
           'display_name': user.username,
@@ -482,7 +355,6 @@ class _NewChatDialogState extends State<_NewChatDialog> {
         room = await _apiService.createChatRoom(token, altRoomData);
       }
       
-      // Try third format
       if (room == null) {
         final altRoomData2 = {
           'name': user.username,
@@ -492,13 +364,12 @@ class _NewChatDialogState extends State<_NewChatDialog> {
         room = await _apiService.createChatRoom(token, altRoomData2);
       }
       
-      if (room != null) {
+      if (room != null && mounted) {
         Navigator.pop(context);
         // Refresh the chat list
-        if (context.mounted) {
-          final chatListState = context.findAncestorStateOfType<_ChatListScreenState>();
-          chatListState?._loadContacts();
-        }
+        final chatListState = context.findAncestorStateOfType<_ChatListScreenState>();
+        chatListState?._loadContacts();
+        
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -508,30 +379,25 @@ class _NewChatDialogState extends State<_NewChatDialog> {
             ),
           ),
         );
-      } else {
-        // Show error message
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to create chat room'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create chat room'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final theme = Theme.of(context);
+    
     return AlertDialog(
-      backgroundColor: themeProvider.cardColor,
+      backgroundColor: theme.cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(
-        'New Chat',
-        style: TextStyle(color: themeProvider.textColor),
-      ),
+      title: Text('New Chat', style: theme.textTheme.titleLarge),
       content: Container(
         width: double.maxFinite,
         height: 400,
@@ -539,14 +405,12 @@ class _NewChatDialogState extends State<_NewChatDialog> {
           children: [
             TextField(
               controller: _searchController,
-              style: TextStyle(color: themeProvider.textColor),
               decoration: InputDecoration(
                 hintText: 'Search users...',
-                hintStyle: TextStyle(color: themeProvider.subtitleColor),
-                prefixIcon: Icon(Icons.search, color: themeProvider.subtitleColor),
+                prefixIcon: Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear, color: themeProvider.subtitleColor),
+                        icon: Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {
@@ -556,13 +420,6 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Color(0xFF2196F3)),
-                ),
               ),
               onChanged: (value) {
                 setState(() {
@@ -583,36 +440,24 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                             _searchQuery.isEmpty
                                 ? 'Start typing to search users'
                                 : 'No users found',
-                            style: TextStyle(color: themeProvider.subtitleColor),
+                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor),
                           ),
                         )
-                      : ListView.builder(
+                      : ListView.separated(
                           itemCount: _searchResults.length,
+                          separatorBuilder: (context, index) => Divider(),
                           itemBuilder: (context, index) {
                             final user = _searchResults[index];
                             return ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: Color(0xFF2196F3),
+                                backgroundColor: theme.primaryColor,
                                 child: Text(
                                   user.username[0].toUpperCase(),
                                   style: TextStyle(color: Colors.white),
                                 ),
                               ),
-                              title: Text(
-                                user.username,
-                                style: TextStyle(color: themeProvider.textColor),
-                              ),
-                              subtitle: user.bio.isNotEmpty
-                                  ? Text(
-                                      user.bio,
-                                      style: TextStyle(color: themeProvider.subtitleColor),
-                                    )
-                                  : user.statusMessage.isNotEmpty
-                                      ? Text(
-                                          user.statusMessage,
-                                          style: TextStyle(color: themeProvider.subtitleColor),
-                                        )
-                                      : null,
+                              title: Text(user.username),
+                              subtitle: user.bio.isNotEmpty ? Text(user.bio) : null,
                               onTap: () => _createChat(user),
                             );
                           },
@@ -624,10 +469,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Cancel',
-            style: TextStyle(color: themeProvider.subtitleColor),
-          ),
+          child: Text('Cancel'),
         ),
       ],
     );

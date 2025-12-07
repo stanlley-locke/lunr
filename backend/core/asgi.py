@@ -13,6 +13,8 @@ django_asgi_app = get_asgi_application()
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 import chat.routing
+import socketio
+from chat.sockets import sio
 
 application = ProtocolTypeRouter({
     # 4. Use the variable we created in step 2
@@ -21,3 +23,6 @@ application = ProtocolTypeRouter({
         URLRouter(chat.routing.websocket_urlpatterns)
     ),
 })
+
+# 5. Wrap with Socket.IO
+application = socketio.ASGIApp(sio, application)

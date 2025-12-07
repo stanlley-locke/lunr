@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
+import '../widgets/custom_app_bar.dart';
 import 'login_screen.dart';
 import 'profile_settings_screen.dart';
 import 'privacy_settings_screen.dart';
@@ -12,30 +14,23 @@ import 'account_settings_screen.dart';
 class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return Scaffold(
-      backgroundColor: themeProvider.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: themeProvider.backgroundColor,
-        elevation: 8,
-        shadowColor: themeProvider.isDarkMode ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.1),
-        title: Row(
-          children: [
-            Image.asset(
-              'assets/icons/lunr_settings_icon.png',
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: CustomAppBar(
+        title: 'Settings',
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Image.asset(
+              'assets/icons/lunr_humburger_icon.png',
               width: 24,
               height: 24,
+              color: theme.iconTheme.color,
             ),
-            SizedBox(width: 8),
-            Text(
-              'Settings',
-              style: TextStyle(
-                color: themeProvider.textColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
       ),
       body: ListView(
@@ -45,60 +40,69 @@ class SettingsScreen extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: themeProvider.cardColor,
-              borderRadius: BorderRadius.circular(16),
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Color(0xFF2196F3),
-                  child: Text(
-                    'U',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ProfileSettingsScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: theme.primaryColor,
+                    child: Text(
+                      'U',
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Username',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: themeProvider.textColor,
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Username',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: theme.textTheme.bodyLarge?.color,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Available',
-                        style: TextStyle(
-                          color: themeProvider.subtitleColor,
-                          fontSize: 14,
+                        SizedBox(height: 4),
+                        Text(
+                          'Available',
+                          style: GoogleFonts.inter(
+                            color: theme.disabledColor,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: themeProvider.subtitleColor,
-                ),
-              ],
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: theme.disabledColor,
+                  ),
+                ],
+              ),
             ),
           ),
           
@@ -110,6 +114,7 @@ class SettingsScreen extends StatelessWidget {
             icon: 'assets/icons/lunr_profile_icon.png',
             title: 'Account',
             subtitle: 'Privacy, security, change number',
+            color: Color(0xFF6366F1), // Indigo
             onTap: () {
               Navigator.push(
                 context,
@@ -123,6 +128,7 @@ class SettingsScreen extends StatelessWidget {
             icon: 'assets/icons/lunr_chats_icon.png',
             title: 'Chats',
             subtitle: 'Theme, wallpapers, chat history',
+            color: Color(0xFF10B981), // Emerald
             onTap: () {
               Navigator.push(
                 context,
@@ -136,6 +142,7 @@ class SettingsScreen extends StatelessWidget {
             icon: 'assets/icons/lunr_notification_icon.png',
             title: 'Notifications',
             subtitle: 'Message, group & call tones',
+            color: Color(0xFFEF4444), // Red
             onTap: () {
               Navigator.push(
                 context,
@@ -149,6 +156,7 @@ class SettingsScreen extends StatelessWidget {
             icon: 'assets/icons/lunr_privacy_icon.png',
             title: 'Privacy',
             subtitle: 'Block contacts, disappearing messages',
+            color: Color(0xFFF59E0B), // Amber
             onTap: () {
               Navigator.push(
                 context,
@@ -159,51 +167,44 @@ class SettingsScreen extends StatelessWidget {
           
           // Theme Switcher
           Container(
-            margin: EdgeInsets.only(bottom: 12),
+            margin: EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: themeProvider.cardColor,
-              borderRadius: BorderRadius.circular(16),
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
               ],
             ),
             child: SwitchListTile(
               contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               secondary: Container(
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Color(0xFF2196F3),
+                  color: Color(0xFF8B5CF6).withOpacity(0.1), // Violet
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0xFF2196F3).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Icon(
                   themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                  color: Colors.white,
+                  color: Color(0xFF8B5CF6),
                   size: 24,
                 ),
               ),
               title: Text(
                 'Dark Mode',
-                style: TextStyle(
+                style: GoogleFonts.outfit(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: themeProvider.textColor,
+                  color: theme.textTheme.bodyLarge?.color,
                 ),
               ),
               subtitle: Text(
                 'Switch app theme',
-                style: TextStyle(
-                  color: themeProvider.subtitleColor,
+                style: GoogleFonts.inter(
+                  color: theme.disabledColor,
                   fontSize: 14,
                 ),
               ),
@@ -211,7 +212,7 @@ class SettingsScreen extends StatelessWidget {
               onChanged: (value) {
                 themeProvider.toggleTheme();
               },
-              activeColor: Color(0xFF2196F3),
+              activeColor: theme.primaryColor,
             ),
           ),
           
@@ -220,6 +221,7 @@ class SettingsScreen extends StatelessWidget {
             icon: 'assets/icons/lunr_help_support_icon.png',
             title: 'Help',
             subtitle: 'Help center, contact us, privacy policy',
+            color: Color(0xFFEC4899), // Pink
             onTap: () {
               // Navigate to help
             },
@@ -233,8 +235,8 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 Text(
                   'Lunr v2.1.0',
-                  style: TextStyle(
-                    color: themeProvider.subtitleColor,
+                  style: GoogleFonts.inter(
+                    color: theme.disabledColor,
                     fontSize: 14,
                   ),
                 ),
@@ -243,10 +245,10 @@ class SettingsScreen extends StatelessWidget {
                   onPressed: () => _showLogoutDialog(context),
                   child: Text(
                     'Logout',
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       color: Colors.red,
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -263,96 +265,111 @@ class SettingsScreen extends StatelessWidget {
     required String icon,
     required String title,
     required String subtitle,
+    required Color color,
     required VoidCallback onTap,
   }) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final theme = Theme.of(context);
+    
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: themeProvider.cardColor,
-        borderRadius: BorderRadius.circular(16),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            offset: Offset(0, 6),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Container(
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Color(0xFF2196F3),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0xFF2196F3).withOpacity(0.3),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Image.asset(
-            icon,
-            width: 24,
-            height: 24,
-            color: Colors.white,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Image.asset(
+                    icon,
+                    width: 24,
+                    height: 24,
+                    // color: color, // Removed to preserve 3D effect
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.inter(
+                          color: theme.disabledColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: theme.disabledColor,
+                ),
+              ],
+            ),
           ),
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: themeProvider.textColor,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: themeProvider.subtitleColor,
-            fontSize: 14,
-          ),
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: themeProvider.subtitleColor,
-        ),
-        onTap: onTap,
       ),
     );
   }
 
   void _showLogoutDialog(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final theme = Theme.of(context);
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: themeProvider.cardColor,
+          backgroundColor: theme.cardColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
             'Logout',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: themeProvider.textColor,
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              color: theme.textTheme.bodyLarge?.color,
             ),
           ),
           content: Text(
             'Are you sure you want to logout?',
-            style: TextStyle(color: themeProvider.subtitleColor),
+            style: GoogleFonts.inter(color: theme.textTheme.bodyMedium?.color),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'Cancel',
-                style: TextStyle(color: themeProvider.subtitleColor),
+                style: GoogleFonts.inter(color: theme.disabledColor),
               ),
             ),
             ElevatedButton(
@@ -365,13 +382,19 @@ class SettingsScreen extends StatelessWidget {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
-                elevation: 8,
-                shadowColor: Colors.red.withOpacity(0.3),
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              child: Text('Logout'),
+              child: Text(
+                'Logout',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         );

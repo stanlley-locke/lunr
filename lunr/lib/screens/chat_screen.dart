@@ -1,8 +1,8 @@
-// lib/screens/chat_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/socket_service.dart';
 import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -25,27 +25,50 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Message> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  Timer? _pollingTimer;
   late int _currentUserId;
 
   final AuthService _authService = AuthService();
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
 
   @override
   void initState() {
     super.initState();
-    _authService.getUserId().then((id) {
-      if (id != null) {
-        _currentUserId = id;
-        _loadMessages();
-      }
-    });
-    _startPolling();
+    _initializeChat();
+  }
+
+  void _initializeChat() async {
+    final userId = await _authService.getUserId();
+    if (userId != null) {
+      _currentUserId = userId;
+      await _loadMessages();
+      
+      // Initialize socket
+      await _socketService.initSocket();
+      _socketService.joinRoom(widget.roomId);
+      
+      _socketService.onMessage((data) {
+        print('New message received: $data');
+        if (mounted) {
+          setState(() {
+            // Avoid duplicates if any
+            final newMessage = Message.fromJson(data);
+            if (!_messages.any((m) => m.id == newMessage.id)) {
+              _messages.add(newMessage);
+              // Sort again just in case
+              _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+            }
+          });
+          _scrollToBottom();
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    _socketService.leaveRoom(widget.roomId);
+    _socketService.offMessage();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -55,30 +78,27 @@ class _ChatScreenState extends State<ChatScreen> {
     final token = await _authService.getToken();
     if (token != null) {
       final messages = await _apiService.getRoomMessages(token, widget.roomId);
-      final parsedMessages = messages
-        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
       
       if (mounted) {
         setState(() {
           _messages = messages;
+          _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
           _isLoading = false;
         });
-        
-        // Scroll to bottom
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
+        _scrollToBottom();
       }
     }
   }
 
-  void _startPolling() {
-    _pollingTimer = Timer.periodic(Duration(seconds: 3), (_) {
-      _loadMessages();
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -90,6 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final token = await _authService.getToken();
     
     if (token != null) {
+      // Send via API
       final message = await _apiService.sendMessage(
         token,
         widget.roomId,
@@ -98,7 +119,7 @@ class _ChatScreenState extends State<ChatScreen> {
       
       if (message != null && mounted) {
         _messageController.clear();
-        _loadMessages(); // Refresh immediately
+        // We rely on the socket to receive the message back and add it to the list
       }
     }
     
@@ -118,10 +139,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? Center(child: Text('No messages yet'))
                     : ListView.builder(
                         controller: _scrollController,
-                        reverse: true,
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
-                          final message = _messages.reversed.toList()[index];
+                          final message = _messages[index];
                           final isOwn = message.sender.id == _currentUserId;
                           return Container(
                             padding: EdgeInsets.all(8),

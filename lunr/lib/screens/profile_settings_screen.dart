@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/custom_button.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   @override
@@ -9,60 +12,86 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final _nameController = TextEditingController(text: 'Username');
   final _aboutController = TextEditingController(text: 'Available');
   final _phoneController = TextEditingController(text: '+1 234 567 8900');
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: theme.iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Profile',
-          style: TextStyle(
-            color: Colors.black,
+          style: GoogleFonts.outfit(
+            color: theme.textTheme.bodyLarge?.color,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              // Save profile changes
-              Navigator.pop(context);
+            onPressed: _isLoading ? null : () async {
+              setState(() => _isLoading = true);
+              // Simulate API call
+              await Future.delayed(Duration(seconds: 1));
+              if (mounted) {
+                setState(() => _isLoading = false);
+                Navigator.pop(context);
+              }
             },
-            child: Text(
-              'Save',
-              style: TextStyle(
-                color: Color(0xFF2196F3),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: _isLoading 
+              ? SizedBox(
+                  width: 20, 
+                  height: 20, 
+                  child: CircularProgressIndicator(strokeWidth: 2)
+                )
+              : Text(
+                  'Save',
+                  style: GoogleFonts.inter(
+                    color: theme.primaryColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(24),
         child: Column(
           children: [
             // Profile Photo Section
             Center(
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Color(0xFF2196F3),
-                    child: Text(
-                      'U',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.primaryColor.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundColor: theme.primaryColor,
+                      child: Text(
+                        'U',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -70,11 +99,18 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      padding: EdgeInsets.all(8),
+                      padding: EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Color(0xFF2196F3),
+                        color: theme.primaryColor,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: theme.scaffoldBackgroundColor, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 5,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Icon(
                         Icons.camera_alt,
@@ -87,49 +123,63 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               ),
             ),
             
-            SizedBox(height: 32),
+            SizedBox(height: 40),
             
             // Name Field
-            _buildTextField(
+            CustomTextField(
               controller: _nameController,
               label: 'Name',
-              icon: Icons.person_outline,
+              hint: 'Enter your name',
+              prefixIcon: Icon(Icons.person_outline, color: theme.primaryColor),
             ),
             
-            SizedBox(height: 16),
+            SizedBox(height: 20),
             
             // About Field
-            _buildTextField(
+            CustomTextField(
               controller: _aboutController,
               label: 'About',
-              icon: Icons.info_outline,
+              hint: 'Tell us about yourself',
+              prefixIcon: Icon(Icons.info_outline, color: theme.primaryColor),
               maxLines: 3,
             ),
             
-            SizedBox(height: 16),
+            SizedBox(height: 20),
             
             // Phone Field
-            _buildTextField(
+            CustomTextField(
               controller: _phoneController,
               label: 'Phone',
-              icon: Icons.phone_outlined,
+              hint: 'Your phone number',
+              prefixIcon: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Image.asset(
+                  'assets/icons/lunr_phone_icon.png',
+                  width: 24,
+                  height: 24,
+                ),
+              ),
               enabled: false,
             ),
             
-            SizedBox(height: 24),
+            SizedBox(height: 32),
             
             // Additional Options
             _buildSettingsTile(
+              context,
               icon: Icons.qr_code,
               title: 'QR Code',
               subtitle: 'Share your QR code with others',
+              color: Color(0xFF6366F1), // Indigo
               onTap: () {},
             ),
             
             _buildSettingsTile(
+              context,
               icon: Icons.link,
               title: 'Username',
               subtitle: 'Create a unique username',
+              color: Color(0xFF10B981), // Emerald
               onTap: () {},
             ),
           ],
@@ -138,109 +188,83 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    int maxLines = 1,
-    bool enabled = true,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        enabled: enabled,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Container(
-            margin: EdgeInsets.all(12),
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Color(0xFF2196F3).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: Color(0xFF2196F3),
-              size: 20,
-            ),
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsTile({
+  Widget _buildSettingsTile(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String subtitle,
+    required Color color,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Color(0xFF2196F3).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            size: 24,
-            color: Color(0xFF2196F3),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: color,
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.inter(
+                          color: theme.disabledColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: theme.disabledColor,
+                ),
+              ],
+            ),
           ),
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 14,
-          ),
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: Colors.grey[600],
-        ),
-        onTap: onTap,
       ),
     );
   }

@@ -16,6 +16,7 @@ from .serializers import (
     NotificationSerializer, UserSettingsSerializer, UpdateSerializer,
     ToolSerializer, UserBlockSerializer, UserReportSerializer, UserProfileSerializer
 )
+import socketio
 
 # Authentication Views
 @api_view(['POST'])
@@ -214,6 +215,15 @@ def send_message(request):
     message = Message.objects.create(**message_data)
     room.updated_at = timezone.now()
     room.save()
+    
+    # Emit to Socket.IO
+    try:
+        # Connect to the same Redis as the server
+        mgr = socketio.RedisManager('redis://127.0.0.1:6379/0', write_only=True)
+        serializer = MessageSerializer(message)
+        mgr.emit('message', serializer.data, room=str(room.id))
+    except Exception as e:
+        print(f"Socket emit error: {e}")
     
     return Response(MessageSerializer(message).data, status=201)
 
