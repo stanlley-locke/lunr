@@ -11,7 +11,9 @@ sio = socketio.AsyncServer(async_mode='asgi', client_manager=mgr, cors_allowed_o
 
 @sio.event
 async def connect(sid, environ):
-    query_string = environ.get('QUERY_STRING', b'').decode('utf-8')
+    query_string = environ.get('QUERY_STRING', '')
+    if isinstance(query_string, bytes):
+        query_string = query_string.decode('utf-8')
     params = parse_qs(query_string)
     token = params.get('token', [None])[0]
     
