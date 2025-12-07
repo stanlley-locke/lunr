@@ -26,8 +26,8 @@ class SocketService {
     _socket = IO.io(socketUrl, IO.OptionBuilder()
       .setTransports(['websocket'])
       .disableAutoConnect()
-      .setExtraHeaders({'Authorization': 'Bearer $token'}) // Common pattern
-      .setQuery({'token': token}) // Also common
+      .setPath('/socket.io/')
+      .setQuery({'token': token})
       .build()
     );
 
