@@ -17,3 +17,4 @@ fcm-django==2.0.0
 django-filter==24.2
 django-extensions==3.2.3
 python-socketio==5.11.2
+daphne==4.1.0

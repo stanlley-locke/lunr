@@ -16,19 +16,6 @@ ALLOWED_HOSTS = ['*']
 # CODESPACES CRITICAL FIX: Trust the GitHub domains for CSRF
 # Without this, login and POST requests will fail 403 Forbidden
 CSRF_TRUSTED_ORIGINS = [
-    'https://*.app.github.dev',
-    'https://*.github.dev',
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-]
-
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
     # Third-party
     'rest_framework',
     'corsheaders',
