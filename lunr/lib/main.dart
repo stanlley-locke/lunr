@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/chat_list_screen.dart';
+import 'screens/main_screen.dart';
 
 void main() {
   runApp(LunrApp());
@@ -30,14 +32,54 @@ class _LunrAppState extends State<LunrApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Lunr',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: _isAuthenticated == null
-          ? Scaffold(body: Center(child: CircularProgressIndicator()))
-          : _isAuthenticated!
-              ? ChatListScreen()
-              : LoginScreen(),
+    return ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Lunr',
+            theme: ThemeProvider.lightTheme,
+            darkTheme: ThemeProvider.darkTheme,
+            themeMode: themeProvider.themeMode,
+            debugShowCheckedModeBanner: false,
+            home: _isAuthenticated == null
+                ? Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF2196F3),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color(0xFF2196F3).withOpacity(0.3),
+                                  blurRadius: 20,
+                                  offset: Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Image.asset(
+                              'assets/icons/lunr_app_icon.png',
+                              width: 60,
+                              height: 60,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          CircularProgressIndicator(),
+                        ],
+                      ),
+                    ),
+                  )
+                : _isAuthenticated!
+                    ? MainScreen()
+                    : LoginScreen(),
+          );
+        },
+      ),
     );
   }
 }
