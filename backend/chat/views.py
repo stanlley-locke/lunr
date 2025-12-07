@@ -118,11 +118,16 @@ def chat_rooms(request):
                 return Response({'error': 'other_user_id required for direct chat'}, status=400)
             
             # Check if direct room already exists
+            # We filter for rooms that have BOTH members and exactly 2 members
             existing_room = ChatRoom.objects.filter(
                 room_type='direct',
                 members=request.user
             ).filter(
                 members=other_user_id
+            ).annotate(
+                count=Count('members')
+            ).filter(
+                count=2
             ).first()
             
             if existing_room:
