@@ -339,30 +339,11 @@ class _NewChatDialogState extends State<_NewChatDialog> {
     final token = await _authService.getToken();
     if (token != null) {
       final roomData = {
-        'name': user.username,
         'room_type': 'direct',
-        'participant_ids': [user.id],
+        'other_user_id': user.id,
       };
       
       var room = await _apiService.createChatRoom(token, roomData);
-      
-      if (room == null) {
-        final altRoomData = {
-          'display_name': user.username,
-          'room_type': 'direct',
-          'participants': [user.id],
-        };
-        room = await _apiService.createChatRoom(token, altRoomData);
-      }
-      
-      if (room == null) {
-        final altRoomData2 = {
-          'name': user.username,
-          'type': 'direct',
-          'members': [user.id],
-        };
-        room = await _apiService.createChatRoom(token, altRoomData2);
-      }
       
       if (room != null && mounted) {
         Navigator.pop(context);
