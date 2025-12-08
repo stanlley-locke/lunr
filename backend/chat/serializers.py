@@ -55,21 +55,33 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
         model = RoomMembership
         fields = ['user', 'role', 'joined_at', 'is_muted']
 
-class ChatRoomSerializer(serializers.ModelSerializer):
     members = RoomMembershipSerializer(source='roommembership_set', many=True, read_only=True)
     member_count = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
     
     class Meta:
         model = ChatRoom
         fields = [
             'id', 'name', 'description', 'room_type', 'avatar',
             'is_private', 'max_members', 'created_at', 'members',
-            'member_count', 'last_message'
+            'member_count', 'last_message', 'unread_count'
         ]
     
     def get_member_count(self, obj):
         return obj.members.count()
+
+    def get_unread_count(self, obj):
+        user = self.context.get('request').user if self.context.get('request') else None
+        if user and user.is_authenticated:
+            # Count messages in this room that are NOT read by this user
+            # Assuming 'read_by' is the related name or manual filter needed
+            # Message has 'readby_set' from MessageRead model?
+            # MessageRead model has 'message' foreign key.
+            # So Message has reverse relation 'messageread_set'.
+            # Logic: messages where messageread_set does not contain user.
+            return obj.messages.exclude(messageread__user=user).count()
+        return 0
     
     def get_last_message(self, obj):
         last_msg = obj.messages.filter(deleted_at__isnull=True).last()

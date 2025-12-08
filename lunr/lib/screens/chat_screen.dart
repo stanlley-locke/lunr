@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import '../models/message.dart';
+import '../services/database_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String roomId;
@@ -19,6 +20,8 @@ class ChatScreen extends StatefulWidget {
   _ChatScreenState createState() => _ChatScreenState();
 }
 
+
+
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
@@ -30,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final AuthService _authService = AuthService();
   final ApiService _apiService = ApiService();
   final SocketService _socketService = SocketService();
+  final DatabaseService _databaseService = DatabaseService();
 
   // Selection Mode
   Set<String> _selectedMessageIds = {};
@@ -45,18 +49,22 @@ class _ChatScreenState extends State<ChatScreen> {
     final userId = await _authService.getUserId();
     if (userId != null) {
       _currentUserId = userId;
-      await _loadMessages();
+      await _loadMessages(forceRefresh: false); // Load local first
       
       // Initialize socket
       await _socketService.initSocket();
       _socketService.joinRoom(widget.roomId);
       
-      _socketService.onMessage((data) {
+      _socketService.onMessage((data) async {
         print('New message received: $data');
         if (mounted) {
+          final newMessage = Message.fromJson(data);
+          
+          // Save to local DB
+          await _databaseService.insertMessage(newMessage);
+          
           setState(() {
             // Avoid duplicates if any
-            final newMessage = Message.fromJson(data);
             if (!_messages.any((m) => m.id == newMessage.id)) {
               _messages.add(newMessage);
               // Sort again just in case
@@ -66,6 +74,9 @@ class _ChatScreenState extends State<ChatScreen> {
           _scrollToBottom();
         }
       });
+      
+      // Sync in background after local load
+      _loadMessages(forceRefresh: true); 
     }
   }
 
@@ -78,20 +89,52 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    final token = await _authService.getToken();
-    if (token != null) {
-      final messages = await _apiService.getRoomMessages(token, widget.roomId);
-      
-      if (mounted) {
+  Future<void> _loadMessages({bool forceRefresh = false}) async {
+    // 1. Load from DB if not forcing refresh (or load anyway to show cache)
+    if (!forceRefresh) {
+      final localMessages = await _databaseService.getMessages(widget.roomId);
+      if (mounted && localMessages.isNotEmpty) {
         setState(() {
-          _messages = messages;
+          _messages = localMessages;
           _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
           _isLoading = false;
         });
-        _scrollToBottom();
+        // Scroll to bottom after loading local messages
+        // Use a slight delay to ensure list is built
+        Future.delayed(Duration(milliseconds: 100), _scrollToBottom);
       }
     }
+
+    // 2. Sync from API
+    if (forceRefresh || _messages.isEmpty) {
+      final token = await _authService.getToken();
+      if (token != null) {
+        try {
+          final messages = await _apiService.getRoomMessages(token, widget.roomId);
+          
+          // Save to DB
+          await _databaseService.insertMessages(messages);
+          
+          if (mounted) {
+            setState(() {
+              _messages = messages;
+              _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+              _isLoading = false;
+            });
+            _scrollToBottom();
+          }
+        } catch (e) {
+          print("Error fetching messages: $e");
+          if (mounted && _messages.isEmpty) {
+            setState(() => _isLoading = false);
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _handleRefresh() async {
+    await _loadMessages(forceRefresh: true);
   }
 
   void _scrollToBottom() {
@@ -170,6 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isLoading = true);
 
     for (var messageId in _selectedMessageIds) {
+      await _databaseService.deleteMessage(messageId);
       await _apiService.deleteMessage(token, messageId);
     }
 
@@ -202,43 +246,47 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
                     ? Center(child: Text('No messages yet'))
-                    : ListView.builder(
-                        controller: _scrollController,
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final message = _messages[index];
-                          final isOwn = message.sender.id == _currentUserId;
-                          final isSelected = _selectedMessageIds.contains(message.id);
-                          
-                          return GestureDetector(
-                            onLongPress: () {
-                              if (isOwn) _toggleSelection(message.id);
-                            },
-                            onTap: () {
-                              if (_isSelectionMode && isOwn) {
+                    : RefreshIndicator(
+                        onRefresh: _handleRefresh,
+                        child: ListView.builder(
+                          physics: AlwaysScrollableScrollPhysics(),
+                          controller: _scrollController,
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final message = _messages[index];
+                            final isOwn = message.sender.id == _currentUserId;
+                            final isSelected = _selectedMessageIds.contains(message.id);
+                            
+                            return GestureDetector(
+                              onLongPress: () {
                                 _toggleSelection(message.id);
-                              }
-                            },
-                            child: Container(
-                              color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
-                              padding: EdgeInsets.all(8),
-                              alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+                              },
+                              onTap: () {
+                                if (_isSelectionMode) {
+                                  _toggleSelection(message.id);
+                                }
+                              },
                               child: Container(
-                                padding: EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isOwn ? Colors.blue : Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  message.content,
-                                  style: TextStyle(
-                                    color: isOwn ? Colors.white : Colors.black,
+                                color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                                padding: EdgeInsets.all(8),
+                                alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  padding: EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isOwn ? Colors.blue : Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    message.content,
+                                    style: TextStyle(
+                                      color: isOwn ? Colors.white : Colors.black,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
           ),
           if (!_isSelectionMode)

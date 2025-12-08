@@ -112,20 +112,16 @@ class ApiService {
 
   // Chat Rooms
   Future<List<ChatRoom>> getChatRooms(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/rooms/'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => ChatRoom.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
+    final response = await http.get(
+      Uri.parse('$_baseUrl/rooms/'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => ChatRoom.fromJson(json)).toList();
     }
+    throw Exception('Failed to load chat rooms: ${response.statusCode}');
   }
 
   Future<ChatRoom?> createChatRoom(String token, Map<String, dynamic> data) async {
@@ -166,20 +162,16 @@ class ApiService {
 
   // Messages
   Future<List<Message>> getRoomMessages(String token, String roomId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/rooms/$roomId/messages/'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => Message.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
+    final response = await http.get(
+      Uri.parse('$_baseUrl/rooms/$roomId/messages/'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Message.fromJson(json)).toList();
     }
+    throw Exception('Failed to load messages: ${response.statusCode}');
   }
 
   Future<Message?> sendMessage(String token, String roomId, String content, {String? replyTo}) async {

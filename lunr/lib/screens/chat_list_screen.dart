@@ -10,11 +10,19 @@ import '../models/chat_room.dart';
 import '../widgets/custom_app_bar.dart';
 import 'login_screen.dart';
 import 'chat_screen.dart';
+import '../services/socket_service.dart';
+import '../services/database_service.dart';
+import '../models/message.dart';
 
 class ChatListScreen extends StatefulWidget {
   final VoidCallback? onMenuPressed;
+  final Function(int)? onUnreadCountChanged;
 
-  const ChatListScreen({Key? key, this.onMenuPressed}) : super(key: key);
+  const ChatListScreen({
+    Key? key, 
+    this.onMenuPressed,
+    this.onUnreadCountChanged,
+  }) : super(key: key);
 
   @override
   _ChatListScreenState createState() => _ChatListScreenState();
@@ -26,18 +34,78 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool _isLoading = true;
   final AuthService _authService = AuthService();
   final ApiService _apiService = ApiService();
+  final SocketService _socketService = SocketService();
+  final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   
   // Selection Mode
   Set<String> _selectedRoomIds = {};
   bool get _isSelectionMode => _selectedRoomIds.isNotEmpty;
+  
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _loadContacts();
+    _fetchCurrentUserId();
+    _loadChats();
+    _setupSocketListeners();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _fetchCurrentUserId() async {
+    final uid = await _authService.getUserId();
+    if (mounted) setState(() => _currentUserId = uid);
+  }
+
+  void _setupSocketListeners() async {
+    print('DEBUG: Setting up socket listeners');
+    await _socketService.initSocket();
+    
+    _socketService.onMessage((data) async {
+      print('DEBUG: Received socket message: $data');
+      if (mounted) {
+        try {
+          final message = Message.fromJson(data);
+          
+          // Save to local DB for persistence
+          await _databaseService.insertMessage(message);
+
+          setState(() {
+            // Find the room and update its last message
+            final roomIndex = _rooms.indexWhere((r) => r.id == message.roomId);
+            if (roomIndex != -1) {
+              final room = _rooms[roomIndex];
+              final updatedRoom = ChatRoom(
+                id: room.id,
+                name: room.name,
+                roomType: room.roomType,
+                members: room.members,
+                createdAt: room.createdAt,
+                lastMessage: message,
+                memberCount: room.memberCount,
+                avatar: room.avatar,
+                description: room.description,
+                isPrivate: room.isPrivate,
+                maxMembers: room.maxMembers,
+              );
+              
+              // Move to top
+              _rooms.removeAt(roomIndex);
+              _rooms.insert(0, updatedRoom);
+              _filterRooms();
+            } else {
+               // New room potentially? Or just sync again
+               print('DEBUG: Room not found for message, reloading chats');
+               _loadChats();
+            }
+          });
+        } catch (e) {
+          print('ERROR: Failed to handle socket message: $e');
+        }
+      }
+    });
   }
 
   @override
@@ -64,20 +132,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
-  Future<void> _loadContacts() async {
-    final token = await _authService.getToken();
-    if (token != null) {
-      final rooms = await _apiService.getChatRooms(token);
-      if (mounted) {
-        setState(() {
-          _rooms = rooms;
-          _filteredRooms = List.from(rooms);
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   void _toggleSelection(String roomId) {
     setState(() {
       if (_selectedRoomIds.contains(roomId)) {
@@ -92,6 +146,65 @@ class _ChatListScreenState extends State<ChatListScreen> {
     setState(() {
       _selectedRoomIds.clear();
     });
+  }
+
+  void _updateUnreadCount() {
+    int total = 0;
+    for (var room in _rooms) {
+      total += room.unreadCount;
+    }
+    widget.onUnreadCountChanged?.call(total);
+  }
+
+  // Alias for backward compatibility if needed, or update calls
+  Future<void> _loadContacts() => _loadChats();
+
+  Future<void> _loadChats() async {
+    // 1. Load from Local DB first
+    final localRooms = await _databaseService.getChatRooms();
+    if (mounted && localRooms.isNotEmpty) {
+      setState(() {
+        _rooms = localRooms;
+        _filterRooms();
+        _isLoading = false;
+        _updateUnreadCount();
+      });
+      // Join rooms for socket updates
+      for (var room in localRooms) {
+        _socketService.joinRoom(room.id);
+      }
+    }
+
+    // 2. Sync with API
+    final token = await _authService.getToken();
+    if (token != null) {
+      try {
+        final rooms = await _apiService.getChatRooms(token);
+        // Save to DB
+        await _databaseService.insertChatRooms(rooms);
+        
+        if (mounted) {
+          setState(() {
+            _rooms = rooms;
+            _filterRooms();
+            _isLoading = false;
+            _updateUnreadCount();
+          });
+          
+          // Join rooms for socket updates
+          for (var room in rooms) {
+            _socketService.joinRoom(room.id);
+          }
+        }
+      } catch (e) {
+        print("Error fetching chats: $e");
+        if (mounted && _rooms.isEmpty) {
+           setState(() => _isLoading = false);
+        }
+      }
+    } else {
+       if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _deleteSelectedRooms() async {
@@ -118,6 +231,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     setState(() => _isLoading = true);
 
     for (var roomId in _selectedRoomIds) {
+      // Delete from local DB
+      await _databaseService.deleteChatRoom(roomId);
+      // Delete from server
       await _apiService.deleteChatRoom(token, roomId);
     }
 
@@ -190,20 +306,34 @@ class _ChatListScreenState extends State<ChatListScreen> {
           
           // Chat List
           Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _filteredRooms.isEmpty
-                    ? _buildEmptyState(theme)
-                    : ListView.separated(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _filteredRooms.length,
-                        separatorBuilder: (context, index) => SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final room = _filteredRooms[index];
-                          final isSelected = _selectedRoomIds.contains(room.id);
-                          return _buildChatTile(room, theme, isSelected);
-                        },
-                      ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await _loadChats();
+              },
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : _filteredRooms.isEmpty
+                      ? LayoutBuilder(
+                          builder: (context, constraints) => SingleChildScrollView(
+                            physics: AlwaysScrollableScrollPhysics(),
+                            child: Container(
+                              height: constraints.maxHeight,
+                              child: _buildEmptyState(theme),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          physics: AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredRooms.length,
+                          separatorBuilder: (context, index) => SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final room = _filteredRooms[index];
+                            final isSelected = _selectedRoomIds.contains(room.id);
+                            return _buildChatTile(room, theme, isSelected);
+                          },
+                        ),
+            ),
           ),
         ],
       ),
@@ -253,6 +383,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildChatTile(ChatRoom room, ThemeData theme, bool isSelected) {
+    // Determine dynamic title
+    String title = room.name;
+    if (_currentUserId != null) {
+      title = room.getDisplayName(_currentUserId!);
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: isSelected ? theme.primaryColor.withOpacity(0.1) : theme.cardColor,
@@ -282,7 +418,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 MaterialPageRoute(
                   builder: (_) => ChatScreen(
                     roomId: room.id,
-                    roomName: room.displayName,
+                    roomName: title,
                   ),
                 ),
               ).then((_) => _loadContacts());
@@ -298,7 +434,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       radius: 28,
                       backgroundColor: theme.primaryColor.withOpacity(0.1),
                       child: Text(
-                        room.displayName.isNotEmpty ? room.displayName[0].toUpperCase() : '?',
+                        title.isNotEmpty ? title[0].toUpperCase() : '?',
                         style: GoogleFonts.outfit(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -328,7 +464,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              room.displayName,
+                              title,
                               style: GoogleFonts.inter(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -338,14 +474,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             ),
                           ),
                           SizedBox(width: 8),
-                          Text(
-                            room.lastMessage != null 
-                              ? DateFormat('h:mm a').format(room.lastMessage!.timestamp.toLocal())
-                              : '',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: theme.disabledColor,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                room.lastMessage != null 
+                                  ? DateFormat('h:mm a').format(room.lastMessage!.timestamp.toLocal())
+                                  : '',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: theme.disabledColor,
+                                ),
+                              ),
+                              if (room.unreadCount > 0) ...[
+                                SizedBox(height: 4),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: theme.primaryColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${room.unreadCount}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),

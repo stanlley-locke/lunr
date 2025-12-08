@@ -13,6 +13,7 @@ class ChatRoom extends Equatable {
   final DateTime createdAt;
   final List<RoomMembership> members;
   final int memberCount;
+  final int unreadCount;
   final Message? lastMessage;
 
   const ChatRoom({
@@ -26,6 +27,7 @@ class ChatRoom extends Equatable {
     required this.createdAt,
     this.members = const [],
     this.memberCount = 0,
+    this.unreadCount = 0,
     this.lastMessage,
   });
 
@@ -43,6 +45,7 @@ class ChatRoom extends Equatable {
           ?.map((m) => RoomMembership.fromJson(m))
           .toList() ?? [],
       memberCount: json['member_count'] ?? 0,
+      unreadCount: json['unread_count'] ?? 0,
       lastMessage: json['last_message'] != null 
           ? Message.fromJson(json['last_message']) 
           : null,
@@ -52,6 +55,7 @@ class ChatRoom extends Equatable {
   bool get isGroup => roomType == 'group';
   bool get isDirect => roomType == 'direct';
   
+  // Deprecated: use getDisplayName
   String get displayName {
     if (isGroup) return name.isNotEmpty ? name : 'Group Chat';
     if (members.isNotEmpty) {
@@ -60,10 +64,24 @@ class ChatRoom extends Equatable {
     return 'Chat';
   }
 
+  String getDisplayName(int currentUserId) {
+    if (isGroup) return name.isNotEmpty ? name : 'Group Chat';
+    
+    // For direct chat, find the OTHER user
+    if (members.isNotEmpty) {
+      final otherMember = members.firstWhere(
+        (m) => m.user.id != currentUserId,
+        orElse: () => members.first,
+      );
+      return otherMember.user.username;
+    }
+    return 'Chat';
+  }
+
   @override
   List<Object?> get props => [
     id, name, description, roomType, avatar, isPrivate,
-    maxMembers, createdAt, members, memberCount, lastMessage
+    maxMembers, createdAt, members, memberCount, unreadCount, lastMessage
   ];
 }
 
@@ -90,6 +108,16 @@ class RoomMembership extends Equatable {
   }
 
   bool get isAdmin => role == 'admin';
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': user.toJson(),
+      'role': role,
+      'joined_at': joinedAt.toIso8601String(),
+      'is_muted': isMuted,
+    };
+  }
+
 
   @override
   List<Object?> get props => [user, role, joinedAt, isMuted];

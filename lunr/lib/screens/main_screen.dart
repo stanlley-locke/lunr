@@ -9,6 +9,8 @@ import 'tools_screen.dart';
 import 'settings_screen.dart';
 import 'profile_settings_screen.dart';
 
+import '../services/permission_service.dart';
+
 class MainScreen extends StatefulWidget {
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -16,6 +18,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  int _unreadCount = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   late List<Widget> _screens;
@@ -23,12 +26,22 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _requestPermissions();
     _screens = [
-      ChatListScreen(onMenuPressed: _openDrawer),
+      ChatListScreen(
+        onMenuPressed: _openDrawer,
+        onUnreadCountChanged: (count) {
+          if (mounted) setState(() => _unreadCount = count);
+        },
+      ),
       GroupsScreen(onMenuPressed: _openDrawer),
       UpdatesScreen(onMenuPressed: _openDrawer),
       ToolsScreen(onMenuPressed: _openDrawer),
     ];
+  }
+
+  Future<void> _requestPermissions() async {
+    await PermissionService().requestInitialPermissions();
   }
 
   void _openDrawer() {
@@ -99,18 +112,49 @@ class _MainScreenState extends State<MainScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Image.asset(
-                          item['icon'],
-                          width: 24,
-                          height: 24,
-                          // color: isSelected ? theme.primaryColor : theme.iconTheme.color?.withOpacity(0.5), // Removed to preserve 3D effect
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Image.asset(
+                              item['icon'],
+                              width: 24,
+                              height: 24,
+                              // color: isSelected ? theme.primaryColor : theme.iconTheme.color?.withOpacity(0.5),
+                            ),
+                            if (index == 0 && _unreadCount > 0)
+                              Positioned(
+                                right: -8,
+                                top: -8,
+                                child: Container(
+                                  padding: EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '$_unreadCount',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         SizedBox(height: 4),
                         Text(
                           item['label'],
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                             color: isSelected ? theme.primaryColor : theme.iconTheme.color?.withOpacity(0.5),
                           ),
                         ),
