@@ -118,21 +118,24 @@ def chat_rooms(request):
             if not other_user_id:
                 return Response({'error': 'other_user_id required for direct chat'}, status=400)
             
+            try:
+                other_user_id = int(other_user_id)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid user ID'}, status=400)
+
             # Check if direct room already exists
-            # We filter for rooms that have BOTH members and exactly 2 members
-            existing_room = ChatRoom.objects.filter(
+            # Find rooms where BOTH users are members and room_type is 'direct'
+            existing_rooms = ChatRoom.objects.filter(
                 room_type='direct',
                 members=request.user
             ).filter(
-                members=other_user_id
-            ).annotate(
-                count=Count('members')
-            ).filter(
-                count=2
-            ).first()
+                members__id=other_user_id
+            )
             
-            if existing_room:
-                return Response(ChatRoomSerializer(existing_room).data)
+            # Verify exact membership count to avoid group chats that might have played tricks (though unlikely with room_type='direct')
+            for room in existing_rooms:
+                if room.members.count() == 2:
+                    return Response(ChatRoomSerializer(room).data)
             
             # Create new direct room
             room = ChatRoom.objects.create(

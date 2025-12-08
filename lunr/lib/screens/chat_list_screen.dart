@@ -293,7 +293,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   'assets/icons/lunr_contacts_icon.png',
                   width: 24,
                   height: 24,
-                  color: theme.iconTheme.color,
                 ),
                 onPressed: () {
                   Navigator.push(

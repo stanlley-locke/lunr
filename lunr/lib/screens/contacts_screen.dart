@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/custom_app_bar.dart';
 import '../models/user.dart';
+import 'chat_screen.dart';
 
 class ContactsScreen extends StatefulWidget {
   @override
@@ -14,15 +15,44 @@ class ContactsScreen extends StatefulWidget {
 
 class _ContactsScreenState extends State<ContactsScreen> {
   List<Contact> _contacts = [];
+  List<Contact> _filteredContacts = [];
   bool _isLoading = true;
   final ApiService _apiService = ApiService();
   final DatabaseService _databaseService = DatabaseService();
   final AuthService _authService = AuthService();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadContacts();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text;
+      _filterContacts();
+    });
+  }
+
+  void _filterContacts() {
+    if (_searchQuery.isEmpty) {
+      _filteredContacts = List.from(_contacts);
+    } else {
+      _filteredContacts = _contacts.where((contact) {
+        final name = contact.alias.isNotEmpty ? contact.alias : contact.user.username;
+        return name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               contact.user.username.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
   }
 
   Future<void> _loadContacts() async {
@@ -31,6 +61,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     if (mounted) {
       setState(() {
         _contacts = localContacts;
+        _filterContacts();
         _isLoading = false;
       });
     }
@@ -43,8 +74,48 @@ class _ContactsScreenState extends State<ContactsScreen> {
       if (mounted) {
         setState(() {
           _contacts = remoteContacts;
+          _filterContacts();
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _startChat(Contact contact) async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Center(child: CircularProgressIndicator()),
+      );
+
+      final roomData = {
+        'room_type': 'direct',
+        'other_user_id': contact.user.id,
+      };
+      
+      final room = await _apiService.createChatRoom(token, roomData);
+      
+      // Hide loading
+      Navigator.pop(context); 
+
+      if (room != null) {
+        final chatName = contact.alias.isNotEmpty ? contact.alias : contact.user.username;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              roomId: room.id,
+              roomName: chatName,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start chat')),
+        );
       }
     }
   }
@@ -185,59 +256,161 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _contacts.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset(
-                        'assets/icons/lunr_contacts_icon.png',
-                        width: 64,
-                        height: 64,
-                        color: theme.disabledColor,
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search contacts...',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
+          ),
+          
+          // Contact List
+          Expanded(
+            child: _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : _filteredContacts.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/icons/lunr_contacts_icon.png',
+                            width: 64,
+                            height: 64,
+                          ),
+                          SizedBox(height: 16),
+                          Text('No contacts found', style: theme.textTheme.titleMedium),
+                        ],
                       ),
-                      SizedBox(height: 16),
-                      Text('No contacts yet', style: theme.textTheme.titleMedium),
-                    ],
+                    )
+                  : ListView.separated(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: _filteredContacts.length,
+                      separatorBuilder: (ctx, index) => SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final contact = _filteredContacts[index];
+                        return _buildContactTile(contact, theme);
+                      },
+                    ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactTile(Contact contact, ThemeData theme) {
+    final displayName = contact.alias.isNotEmpty ? contact.alias : contact.user.username;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _startChat(contact),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.primaryColor.withOpacity(0.1),
+                  child: Text(
+                    displayName[0].toUpperCase(),
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: _contacts.length,
-                  itemBuilder: (context, index) {
-                    final contact = _contacts[index];
-                    final displayName = contact.alias.isNotEmpty ? contact.alias : contact.user.username;
-                    
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: theme.primaryColor.withOpacity(0.1),
-                        child: Text(
-                          displayName[0].toUpperCase(),
-                          style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textTheme.bodyLarge?.color,
                         ),
                       ),
-                      title: Text(displayName, style: theme.textTheme.bodyLarge),
-                      subtitle: contact.alias.isNotEmpty ? Text(contact.user.username) : null,
-                      trailing: PopupMenuButton(
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Edit Alias')]),
+                      if (contact.alias.isNotEmpty)
+                        Text(
+                          contact.user.username,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: theme.disabledColor,
                           ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(children: [Icon(Icons.delete, color: Colors.red, size: 20), SizedBox(width: 8), Text('Delete')]),
-                          ),
-                        ],
-                        onSelected: (value) {
-                          if (value == 'edit') _showEditContactDialog(contact);
-                          if (value == 'delete') _deleteContact(contact);
-                        },
-                      ),
-                    );
-                  },
+                        ),
+                    ],
+                  ),
                 ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Image.asset('assets/icons/lunr_chats_icon.png', width: 24, height: 24),
+                      onPressed: () => _startChat(contact),
+                      tooltip: 'Message',
+                    ),
+                    IconButton(
+                      icon: Image.asset('assets/icons/lunr_phone_icon.png', width: 24, height: 24),
+                      onPressed: () {
+                         ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(content: Text('Audio calls coming soon!')),
+                         );
+                      },
+                      tooltip: 'Call',
+                    ),
+                    PopupMenuButton(
+                      icon: Icon(Icons.more_vert, color: theme.disabledColor),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Edit Alias')]),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(children: [Icon(Icons.delete, color: Colors.red, size: 20), SizedBox(width: 8), Text('Delete')]),
+                        ),
+                      ],
+                      onSelected: (value) {
+                        if (value == 'edit') _showEditContactDialog(contact);
+                        if (value == 'delete') _deleteContact(contact);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
