@@ -387,6 +387,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
     String title = room.name;
     if (_currentUserId != null) {
       title = room.getDisplayName(_currentUserId!);
+      // DEBUG LOG
+      // print('DEBUG: Room ${room.id} Title: $title (Current User: $_currentUserId)');
+    } else {
+      print('DEBUG: _currentUserId is NULL, using raw name: ${room.name}');
     }
 
     return Container(
