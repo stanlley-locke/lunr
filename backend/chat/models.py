@@ -189,3 +189,16 @@ class Tool(models.Model):
     
     def __str__(self):
         return self.name
+
+class Contact(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts')
+    contact_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_by')
+    alias = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['user', 'contact_user']
+        ordering = ['alias', 'contact_user__username']
+    
+    def __str__(self):
+        return f"{self.user.username} -> {self.alias or self.contact_user.username}"
