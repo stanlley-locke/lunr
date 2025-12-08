@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart';
+import '../services/database_service.dart';
+import '../models/user.dart';
 import '../widgets/custom_app_bar.dart';
 import 'login_screen.dart';
 import 'profile_settings_screen.dart';
@@ -11,7 +15,45 @@ import 'notifications_settings_screen.dart';
 import 'chat_settings_screen.dart';
 import 'account_settings_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
+  @override
+  _SettingsScreenState createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  User? _currentUser;
+  final ApiService _apiService = ApiService();
+  final DatabaseService _databaseService = DatabaseService();
+  final AuthService _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    // 1. Load from Local DB first
+    final localUser = await _databaseService.getCurrentUser();
+    if (mounted && localUser != null) {
+      setState(() => _currentUser = localUser);
+    }
+
+    // 2. Sync with API
+    final token = await _authService.getToken();
+    if (token != null) {
+      try {
+        final user = await _apiService.getProfile(token);
+        if (mounted && user != null) {
+          await _databaseService.saveCurrentUser(user);
+          setState(() => _currentUser = user);
+        }
+      } catch (e) {
+        print('Error refreshing profile in settings: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -21,16 +63,9 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(
         title: 'Settings',
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Image.asset(
-              'assets/icons/lunr_humburger_icon.png',
-              width: 24,
-              height: 24,
-              color: theme.iconTheme.color,
-            ),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.iconTheme.color),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: ListView(
@@ -51,11 +86,13 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
             child: InkWell(
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => ProfileSettingsScreen()),
                 );
+                // Refresh profile on return
+                _loadProfile();
               },
               borderRadius: BorderRadius.circular(20),
               child: Row(
@@ -63,14 +100,19 @@ class SettingsScreen extends StatelessWidget {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: theme.primaryColor,
-                    child: Text(
-                      'U',
-                      style: GoogleFonts.outfit(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
+                      ? CachedNetworkImageProvider(_currentUser!.avatar!) 
+                      : null,
+                    child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http'))
+                      ? Text(
+                          (_currentUser?.username ?? 'U')[0].toUpperCase(),
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                   ),
                   SizedBox(width: 16),
                   Expanded(
@@ -78,7 +120,7 @@ class SettingsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Username',
+                          _currentUser?.username ?? 'Loading...',
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -87,11 +129,15 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Available',
+                          (_currentUser?.statusMessage != null && _currentUser!.statusMessage.isNotEmpty)
+                              ? _currentUser!.statusMessage
+                              : 'Available',
                           style: GoogleFonts.inter(
                             color: theme.disabledColor,
                             fontSize: 14,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -302,7 +348,6 @@ class SettingsScreen extends StatelessWidget {
                     icon,
                     width: 24,
                     height: 24,
-                    // color: color, // Removed to preserve 3D effect
                   ),
                 ),
                 SizedBox(width: 16),

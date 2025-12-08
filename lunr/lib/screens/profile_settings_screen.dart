@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -319,7 +320,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     child: CircleAvatar(
                       radius: 60,
                       backgroundColor: theme.primaryColor.withOpacity(0.1),
-                      backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) ? NetworkImage(_currentUser!.avatar!) : null,
+                      backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
+                        ? CachedNetworkImageProvider(_currentUser!.avatar!) 
+                        : null,
                       child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http')) 
                         ? Text(
                             (_currentUser?.username ?? 'U')[0].toUpperCase(),

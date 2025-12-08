@@ -22,7 +22,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'avatar', 'bio', 'phone_number',
-            'date_of_birth', 'status_message', 'is_verified'
+            'date_of_birth', 'status_message', 'is_verified',
+            'show_last_seen', 'show_read_receipts', 'show_profile_photo', 'show_status'
         ]
         read_only_fields = ['id', 'username', 'is_verified']
 
@@ -61,6 +62,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
             if request:
                 ret['avatar'] = request.build_absolute_uri(instance.avatar.url)
         return ret
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+
+    def validate_new_password(self, value):
+        validate_password(value)
+        return value
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)

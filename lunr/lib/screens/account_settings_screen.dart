@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/custom_app_bar.dart';
+import 'privacy_settings_screen.dart';
+import 'security_settings_screen.dart';
+import 'blocked_contacts_screen.dart';
+import 'delete_account_screen.dart';
 
 class AccountSettingsScreen extends StatelessWidget {
   @override
@@ -8,65 +13,46 @@ class AccountSettingsScreen extends StatelessWidget {
     
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
+      appBar: CustomAppBar(
+        title: 'Account',
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: theme.iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Account',
-          style: GoogleFonts.outfit(
-            color: theme.textTheme.bodyLarge?.color,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
       body: ListView(
-        padding: EdgeInsets.all(24),
+        padding: EdgeInsets.all(16),
         children: [
           _buildSettingsTile(
             context,
-            icon: 'assets/icons/lunr_privacy_icon.png',
+            icon: Icons.lock_outline,
             title: 'Privacy',
-            subtitle: 'Last seen, profile photo, about',
-            color: Color(0xFF6366F1), // Indigo
-            onTap: () {},
+            subtitle: 'Last seen, read receipts, profile photo',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PrivacySettingsScreen())),
           ),
           _buildSettingsTile(
             context,
-            icon: Icons.security,
+            icon: Icons.security_outlined,
             title: 'Security',
-            subtitle: 'End-to-end encryption, login alerts',
-            color: Color(0xFF10B981), // Emerald
-            onTap: () {},
+            subtitle: 'Change password',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SecuritySettingsScreen())),
           ),
           _buildSettingsTile(
             context,
-            icon: 'assets/icons/lunr_profile_icon.png',
-            title: 'Avatar',
-            subtitle: 'Create, edit, profile photo',
-            color: Color(0xFFF59E0B), // Amber
-            onTap: () {},
-          ),
-          _buildSettingsTile(
-            context,
-            icon: Icons.block,
-            title: 'Blocked contacts',
+            icon: Icons.block_outlined,
+            title: 'Blocked Contacts',
             subtitle: 'Manage blocked users',
-            color: Color(0xFFEF4444), // Red
-            onTap: () {},
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BlockedContactsScreen())),
           ),
+          SizedBox(height: 24),
           _buildSettingsTile(
             context,
-            icon: Icons.delete_outline,
-            title: 'Delete my account',
-            subtitle: 'Delete account and erase your data',
+            icon: Icons.delete_forever_outlined,
+            title: 'Delete Account',
+            subtitle: 'Permanently delete your account',
             color: Colors.red,
-            isDestructive: true,
-            onTap: () {},
+            textColor: Colors.red,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DeleteAccountScreen())),
           ),
         ],
       ),
@@ -75,12 +61,12 @@ class AccountSettingsScreen extends StatelessWidget {
 
   Widget _buildSettingsTile(
     BuildContext context, {
-    required dynamic icon,
+    required IconData icon,
     required String title,
     required String subtitle,
-    required Color color,
     required VoidCallback onTap,
-    bool isDestructive = false,
+    Color? color,
+    Color? textColor,
   }) {
     final theme = Theme.of(context);
     
@@ -109,21 +95,14 @@ class AccountSettingsScreen extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: (isDestructive ? Colors.red : color).withOpacity(0.1),
+                    color: (color ?? theme.primaryColor).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: icon is String
-                      ? Image.asset(
-                          icon,
-                          width: 24,
-                          height: 24,
-                          // color: isDestructive ? Colors.red : color, // Removed to preserve 3D effect
-                        )
-                      : Icon(
-                          icon,
-                          size: 24,
-                          color: isDestructive ? Colors.red : color,
-                        ),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: color ?? theme.primaryColor,
+                  ),
                 ),
                 SizedBox(width: 16),
                 Expanded(
@@ -135,7 +114,7 @@ class AccountSettingsScreen extends StatelessWidget {
                         style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: isDestructive ? Colors.red : theme.textTheme.bodyLarge?.color,
+                          color: textColor ?? theme.textTheme.bodyLarge?.color,
                         ),
                       ),
                       SizedBox(height: 2),

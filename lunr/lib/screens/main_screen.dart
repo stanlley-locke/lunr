@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/database_service.dart'; // Added missing import
 import 'chat_list_screen.dart';
 import 'groups_screen.dart';
 import 'updates_screen.dart';
@@ -57,13 +59,27 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _loadUserProfile() async {
+    // 1. Load from Local DB first
+    final localUser = await DatabaseService().getCurrentUser();
+    if (mounted && localUser != null) {
+      setState(() => _currentUser = localUser);
+    }
+
+    // 2. Sync with API
     final token = await _authService.getToken();
     print('DEBUG: Loading profile, token: ${token != null}');
     if (token != null) {
-      final user = await _apiService.getProfile(token);
-      print('DEBUG: Profile fetched: ${user?.username}');
-      if (mounted && user != null) {
-        setState(() => _currentUser = user);
+      try {
+        final user = await _apiService.getProfile(token);
+        print('DEBUG: Profile fetched from API: ${user?.username}');
+        if (mounted && user != null) {
+          // Update DB
+          await DatabaseService().saveCurrentUser(user);
+          // Update UI
+          setState(() => _currentUser = user);
+        }
+      } catch (e) {
+        print('ERROR: Failed to fetch profile from API: $e');
       }
     } else {
         print('DEBUG: No token found');
@@ -232,7 +248,9 @@ class _MainScreenState extends State<MainScreen> {
                   child: CircleAvatar(
                     radius: 32,
                     backgroundColor: theme.scaffoldBackgroundColor,
-                    backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) ? NetworkImage(_currentUser!.avatar!) : null,
+                    backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
+                      ? CachedNetworkImageProvider(_currentUser!.avatar!) 
+                      : null,
                     child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http')) 
                       ? Text(
                           (_currentUser?.username ?? 'U')[0].toUpperCase(),
@@ -260,7 +278,7 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        _currentUser?.email ?? '',
+                        _currentUser?.phoneNumber ?? _currentUser?.email ?? '',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           color: theme.disabledColor,

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
+import '../services/api_service.dart';
+import '../services/database_service.dart';
+import '../models/user.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
   @override
@@ -7,10 +11,91 @@ class PrivacySettingsScreen extends StatefulWidget {
 }
 
 class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
+  final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
+  final DatabaseService _databaseService = DatabaseService();
+  
+  bool _isLoading = true;
+  User? _currentUser;
+
+  // Settings
   bool _showLastSeen = true;
   bool _showProfilePhoto = true;
   bool _showReadReceipts = true;
   bool _showStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    // 1. Load from Cache (Database)
+    final cachedUser = await _databaseService.getCurrentUser();
+    if (cachedUser != null) {
+      if (mounted) {
+        setState(() {
+          _currentUser = cachedUser;
+          _updateLocalStateFromUser(cachedUser);
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Sync with API
+    final token = await _authService.getToken();
+    if (token != null) {
+      final apiUser = await _apiService.getProfile(token);
+      if (apiUser != null) {
+        // Update Cache
+        await _databaseService.saveCurrentUser(apiUser);
+        if (mounted) {
+          setState(() {
+            _currentUser = apiUser;
+            _updateLocalStateFromUser(apiUser);
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  void _updateLocalStateFromUser(User user) {
+    _showLastSeen = user.showLastSeen;
+    _showProfilePhoto = user.showProfilePhoto;
+    _showReadReceipts = user.showReadReceipts;
+    _showStatus = user.showStatus;
+  }
+
+  Future<void> _updateSetting(String key, bool value) async {
+    // Optimistic Update
+    setState(() {
+      if (key == 'show_last_seen') _showLastSeen = value;
+      if (key == 'show_profile_photo') _showProfilePhoto = value;
+      if (key == 'show_read_receipts') _showReadReceipts = value;
+      if (key == 'show_status') _showStatus = value;
+    });
+
+    final token = await _authService.getToken();
+    if (token != null) {
+      final updatedUser = await _apiService.updateProfile(token, {key: value});
+      if (updatedUser != null) {
+        await _databaseService.saveCurrentUser(updatedUser);
+      } else {
+        // Revert on failure
+        if (mounted) {
+          setState(() {
+            // Revert logic (simplified)
+             _loadSettings(); // Reload to reset state
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update setting')),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +119,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           ),
         ),
       ),
-      body: ListView(
+      body: _isLoading 
+          ? Center(child: CircularProgressIndicator()) 
+          : ListView(
         padding: EdgeInsets.all(24),
         children: [
           Text(
@@ -54,11 +141,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: 'Show when you were last online',
             value: _showLastSeen,
             color: Color(0xFF6366F1), // Indigo
-            onChanged: (value) {
-              setState(() {
-                _showLastSeen = value;
-              });
-            },
+            onChanged: (value) => _updateSetting('show_last_seen', value),
           ),
           
           _buildSwitchTile(
@@ -68,11 +151,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: 'Show your profile photo to contacts',
             value: _showProfilePhoto,
             color: Color(0xFF10B981), // Emerald
-            onChanged: (value) {
-              setState(() {
-                _showProfilePhoto = value;
-              });
-            },
+            onChanged: (value) => _updateSetting('show_profile_photo', value),
           ),
           
           _buildSwitchTile(
@@ -82,11 +161,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: 'Show blue ticks when you read messages',
             value: _showReadReceipts,
             color: Color(0xFF3B82F6), // Blue
-            onChanged: (value) {
-              setState(() {
-                _showReadReceipts = value;
-              });
-            },
+            onChanged: (value) => _updateSetting('show_read_receipts', value),
           ),
           
           _buildSwitchTile(
@@ -96,41 +171,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             subtitle: 'Show your status message',
             value: _showStatus,
             color: Color(0xFFF59E0B), // Amber
-            onChanged: (value) {
-              setState(() {
-                _showStatus = value;
-              });
-            },
-          ),
-          
-          SizedBox(height: 32),
-          
-          Text(
-            'Security',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.primaryColor,
-            ),
-          ),
-          SizedBox(height: 16),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.block,
-            title: 'Blocked Contacts',
-            subtitle: 'Manage blocked users',
-            color: Color(0xFFEF4444), // Red
-            onTap: () {},
-          ),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.lock,
-            title: 'Two-Step Verification',
-            subtitle: 'Add extra security to your account',
-            color: Color(0xFF8B5CF6), // Violet
-            onTap: () {},
+            onChanged: (value) => _updateSetting('show_status', value),
           ),
         ],
       ),
@@ -193,87 +234,6 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         value: value,
         onChanged: onChanged,
         activeColor: theme.primaryColor,
-      ),
-    );
-  }
-
-  Widget _buildSettingsTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: color,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.outfit(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: theme.textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: GoogleFonts.inter(
-                          color: theme.disabledColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: theme.disabledColor,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

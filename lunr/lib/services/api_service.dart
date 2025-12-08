@@ -58,6 +58,83 @@ class ApiService {
     }
   }
 
+  // Account Management
+  Future<bool> changePassword(String token, String oldPassword, String newPassword) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/change-password/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({
+          'old_password': oldPassword,
+          'new_password': newPassword
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteAccount(String token) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/auth/delete/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> blockUser(String token, int userId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/privacy/block/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'user_id': userId}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> unblockUser(String token, int userId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/privacy/unblock/$userId/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<User>> getBlockedUsers(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/privacy/blocked/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => User.fromJson(json['blocked_user'])).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   // Profile
   Future<User?> getProfile(String token) async {
     try {

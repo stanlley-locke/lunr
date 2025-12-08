@@ -763,3 +763,25 @@ class FileUploadView(generics.CreateAPIView):
             'media_type': media.media_type,
             'created_at': media.created_at
         }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    from .serializers import ChangePasswordSerializer
+    serializer = ChangePasswordSerializer(data=request.data)
+    if serializer.is_valid():
+        user = request.user
+        if not user.check_password(serializer.data.get('old_password')):
+            return Response({'error': 'Wrong password'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.set_password(serializer.data.get('new_password'))
+        user.save()
+        return Response({'message': 'Password updated successfully'})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    user = request.user
+    user.delete()
+    return Response({'message': 'Account deleted successfully'})

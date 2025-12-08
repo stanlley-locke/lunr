@@ -2,12 +2,12 @@
 from django.urls import path
 from .views import (
     # Authentication
-    register, login, logout,
+    register, login, logout, change_password, delete_account,
     
     # User Profile
     user_profile, search_users,
     
-    # Chat Rooms
+    
     # Chat Rooms
     chat_rooms, chat_room_detail, room_messages, mark_room_read,
     room_members, room_member_detail,
@@ -36,6 +36,8 @@ urlpatterns = [
     path('auth/register/', register, name='register'),
     path('auth/login/', login, name='login'),
     path('auth/logout/', logout, name='logout'),
+    path('auth/change-password/', change_password, name='change_password'),
+    path('auth/delete/', delete_account, name='delete_account'),
     
     # User Profile
     path('profile/', user_profile, name='user_profile'),

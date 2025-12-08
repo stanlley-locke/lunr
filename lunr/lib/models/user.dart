@@ -14,6 +14,7 @@ class User extends Equatable {
   final bool showLastSeen;
   final bool showReadReceipts;
   final bool showProfilePhoto;
+  final bool showStatus;
 
   const User({
     required this.id,
@@ -29,6 +30,7 @@ class User extends Equatable {
     this.showLastSeen = true,
     this.showReadReceipts = true,
     this.showProfilePhoto = true,
+    this.showStatus = true,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -46,6 +48,7 @@ class User extends Equatable {
       showLastSeen: json['show_last_seen'] ?? true,
       showReadReceipts: json['show_read_receipts'] ?? true,
       showProfilePhoto: json['show_profile_photo'] ?? true,
+      showStatus: json['show_status'] ?? true,
     );
   }
 
@@ -64,6 +67,7 @@ class User extends Equatable {
       'show_last_seen': showLastSeen,
       'show_read_receipts': showReadReceipts,
       'show_profile_photo': showProfilePhoto,
+      'show_status': showStatus,
     };
   }
 
@@ -81,6 +85,7 @@ class User extends Equatable {
     bool? showLastSeen,
     bool? showReadReceipts,
     bool? showProfilePhoto,
+    bool? showStatus,
   }) {
     return User(
       id: id ?? this.id,
@@ -96,12 +101,13 @@ class User extends Equatable {
       showLastSeen: showLastSeen ?? this.showLastSeen,
       showReadReceipts: showReadReceipts ?? this.showReadReceipts,
       showProfilePhoto: showProfilePhoto ?? this.showProfilePhoto,
+      showStatus: showStatus ?? this.showStatus,
     );
   }
 
   @override
   List<Object?> get props => [
     id, username, email, avatar, bio, statusMessage, onlineStatus, 
-    lastSeen, isVerified, showLastSeen, showReadReceipts, showProfilePhoto
+    lastSeen, isVerified, showLastSeen, showReadReceipts, showProfilePhoto, showStatus
   ];
 }
