@@ -10,6 +10,7 @@ import '../models/chat_room.dart';
 import '../widgets/custom_app_bar.dart';
 import 'login_screen.dart';
 import 'chat_screen.dart';
+import 'contacts_screen.dart';
 import '../services/socket_service.dart';
 import '../services/database_service.dart';
 import '../models/message.dart';
@@ -69,8 +70,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
         try {
           final message = Message.fromJson(data);
           
+          // Determine if we should count this as unread
+          // If we sent it, OR if we are currently viewing this chat (activeRoomId)
+          bool isUnread = false;
+          if (_currentUserId != null && message.sender.id != _currentUserId) {
+            if (_socketService.activeRoomId != message.roomId) {
+               isUnread = true;
+            }
+          }
+          
           // Save to local DB for persistence
-          await _databaseService.insertMessage(message);
+          await _databaseService.insertMessage(message, isUnread: isUnread);
 
           setState(() {
             // Find the room and update its last message
@@ -85,6 +95,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 createdAt: room.createdAt,
                 lastMessage: message,
                 memberCount: room.memberCount,
+                unreadCount: isUnread ? room.unreadCount + 1 : room.unreadCount, // Increment if unread
                 avatar: room.avatar,
                 description: room.description,
                 isPrivate: room.isPrivate,
@@ -95,6 +106,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
               _rooms.removeAt(roomIndex);
               _rooms.insert(0, updatedRoom);
               _filterRooms();
+              
+              // Update total count
+              _updateUnreadCount();
             } else {
                // New room potentially? Or just sync again
                print('DEBUG: Room not found for message, reloading chats');
@@ -275,9 +289,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.search, color: theme.iconTheme.color),
+                icon: Icon(Icons.contacts, color: theme.iconTheme.color),
                 onPressed: () {
-                  // Expand search bar
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ContactsScreen()),
+                  ).then((_) => _loadContacts());
                 },
               ),
             ],

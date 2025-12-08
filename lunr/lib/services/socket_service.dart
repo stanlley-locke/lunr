@@ -15,6 +15,7 @@ class SocketService {
 
   IO.Socket get socket => _socket;
   bool get isConnected => _isConnected;
+  String? activeRoomId;
 
   Future<void> initSocket() async {
     final token = await _authService.getToken();
@@ -67,7 +68,7 @@ class SocketService {
     _socket.on('message', callback);
   }
   
-  void offMessage() {
-    _socket.off('message');
+  void offMessage(Function(dynamic) callback) {
+    _socket.off('message', callback);
   }
 }

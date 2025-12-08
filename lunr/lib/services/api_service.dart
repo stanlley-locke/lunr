@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../models/chat_room.dart';
 import '../models/message.dart';
 import '../models/user_settings.dart';
+import '../models/contact.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev/api';
@@ -325,6 +326,78 @@ class ApiService {
       return [];
     } catch (e) {
       return [];
+    }
+  }
+
+  // Contacts
+  Future<List<Contact>> getContacts(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/contacts/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Contact.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Contact?> addContact(String token, String username) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/contacts/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'username': username}),
+      );
+      
+      if (response.statusCode == 201) {
+        return Contact.fromJson(jsonDecode(response.body));
+      } else if (response.statusCode == 200 && jsonDecode(response.body)['contact'] != null) {
+         return Contact.fromJson(jsonDecode(response.body)['contact']);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<Contact?> updateContact(String token, int id, String alias) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/contacts/$id/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'alias': alias}),
+      );
+      
+      if (response.statusCode == 200) {
+        return Contact.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> deleteContact(String token, int id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/contacts/$id/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 }

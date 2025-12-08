@@ -3,6 +3,7 @@ import 'package:path/path.dart';
 import '../models/chat_room.dart';
 import '../models/message.dart';
 import '../models/user.dart';
+import '../models/contact.dart';
 import 'dart:convert';
 
 class DatabaseService {
@@ -24,7 +25,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4, // Bump version again to force upgrade check
+      version: 5, // Bump version for Contacts
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           try {
@@ -41,14 +42,28 @@ class DatabaseService {
           }
         }
         if (oldVersion < 4) {
-           // Ensure unread_count exists even if v3 skipped
            try {
-             // We can check if column exists or just try adding it again (sqlite gives error if exists)
-             // or simpler: just catch the error if it already exists
             await db.execute('ALTER TABLE chat_rooms ADD COLUMN unread_count INTEGER DEFAULT 0');
            } catch (e) {
              print('Migration (v4) - unread_count likely exists: $e');
            }
+        }
+        if (oldVersion < 5) {
+          try {
+            await db.execute('''
+              CREATE TABLE contacts(
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                username TEXT,
+                alias TEXT,
+                avatar TEXT,
+                bio TEXT,
+                created_at TEXT
+              )
+            ''');
+          } catch (e) {
+            print('Migration (v5) error: $e');
+          }
         }
       },
       onCreate: (db, version) async {
@@ -72,6 +87,18 @@ class DatabaseService {
             timestamp TEXT,
             sender_json TEXT, -- Store full user JSON for checking ID etc
             room_id TEXT
+          )
+        ''');
+        
+        await db.execute('''
+          CREATE TABLE contacts(
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            username TEXT,
+            alias TEXT,
+            avatar TEXT,
+            bio TEXT,
+            created_at TEXT
           )
         ''');
       },
@@ -216,7 +243,7 @@ class DatabaseService {
     }
   }
 
-  Future<void> insertMessage(Message message) async {
+  Future<void> insertMessage(Message message, {bool isUnread = false}) async {
     final db = await database;
     await db.insert(
       'messages',
@@ -229,6 +256,7 @@ class DatabaseService {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    
     // Also update last message in chat room
     await db.update(
       'chat_rooms',
@@ -239,6 +267,13 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [message.roomId],
     );
+
+    if (isUnread) {
+      await db.rawUpdate(
+        'UPDATE chat_rooms SET unread_count = unread_count + 1 WHERE id = ?',
+        [message.roomId],
+      );
+    }
   }
 
   Future<void> deleteChatRoom(String roomId) async {
@@ -273,5 +308,42 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [roomId],
     );
+  }
+
+  // --- Contacts ---
+
+  Future<void> insertContacts(List<Contact> contacts) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var contact in contacts) {
+      batch.insert(
+        'contacts',
+        contact.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+  
+  Future<List<Contact>> getContacts() async {
+    final db = await database;
+    final maps = await db.query('contacts', orderBy: 'alias ASC');
+    return List.generate(maps.length, (i) {
+      return Contact.fromMap(maps[i]);
+    });
+  }
+  
+  Future<void> insertContact(Contact contact) async {
+    final db = await database;
+    await db.insert(
+      'contacts',
+      contact.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+  
+  Future<void> deleteContact(int id) async {
+    final db = await database;
+    await db.delete('contacts', where: 'id = ?', whereArgs: [id]);
   }
 }

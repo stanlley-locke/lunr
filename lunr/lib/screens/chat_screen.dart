@@ -39,6 +39,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Set<String> _selectedMessageIds = {};
   bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
 
+  // Handler reference for removal
+  late Function(dynamic) _messageHandler;
+
   @override
   void initState() {
     super.initState();
@@ -59,18 +62,16 @@ class _ChatScreenState extends State<ChatScreen> {
       // Initialize socket
       await _socketService.initSocket();
       _socketService.joinRoom(widget.roomId);
+      _socketService.activeRoomId = widget.roomId; // Track active room
       
-      _socketService.onMessage((data) async {
+      // Define handler
+      _messageHandler = (data) async {
         print('New message received: $data');
         if (mounted) {
           final newMessage = Message.fromJson(data);
           
-          // Save to local DB
+          // Save to local DB (no unread increment)
           await _databaseService.insertMessage(newMessage);
-          
-          // If we receive a message while in the chat, mark it as read? 
-          // Ideally yes, but for now we rely on re-opening or manual triggers.
-          // Or we can call markRead here too if the user is "active".
           
           setState(() {
             // Avoid duplicates if any
@@ -82,7 +83,9 @@ class _ChatScreenState extends State<ChatScreen> {
           });
           _scrollToBottom();
         }
-      });
+      };
+
+      _socketService.onMessage(_messageHandler);
       
       // Sync in background after local load
       await _loadMessages(forceRefresh: true);
@@ -93,8 +96,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _socketService.activeRoomId = null; // Clear active room
     _socketService.leaveRoom(widget.roomId);
-    _socketService.offMessage();
+    if (this._currentUserId != null) { // Safe check if initialized
+       try {
+         _socketService.offMessage(_messageHandler);
+       } catch (e) {
+         // Handler might not have been assigned if init failed
+       }
+    }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

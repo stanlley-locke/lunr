@@ -11,6 +11,9 @@ from .views import (
     # Chat Rooms
     chat_rooms, chat_room_detail, room_messages, mark_room_read,
     
+    # Contacts
+    contacts, contact_detail,
+    
     # Messages
     send_message, message_detail, add_reaction,
     
@@ -40,6 +43,10 @@ urlpatterns = [
     path('rooms/<uuid:room_id>/', chat_room_detail, name='chat_room_detail'),
     path('rooms/<uuid:room_id>/messages/', room_messages, name='room_messages'),
     path('rooms/<uuid:room_id>/read/', mark_room_read, name='mark_room_read'),
+    
+    # Contacts
+    path('contacts/', contacts, name='contacts'),
+    path('contacts/<int:contact_id>/', contact_detail, name='contact_detail'),
     
     # Messages
     path('messages/', send_message, name='send_message'),

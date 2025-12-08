@@ -9,12 +9,13 @@ from django.db.models import Q, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from .models import (
     User, Message, ChatRoom, RoomMembership, UserBlock, UserReport,
-    Notification, UserSettings, Update, Tool, MessageRead
+    Notification, UserSettings, Update, Tool, MessageRead, Contact
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, MessageSerializer, ChatRoomSerializer,
     NotificationSerializer, UserSettingsSerializer, UpdateSerializer,
-    ToolSerializer, UserBlockSerializer, UserReportSerializer, UserProfileSerializer
+    ToolSerializer, UserBlockSerializer, UserReportSerializer, UserProfileSerializer,
+    ContactSerializer
 )
 import socketio
 import json
