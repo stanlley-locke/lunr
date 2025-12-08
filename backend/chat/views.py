@@ -75,11 +75,11 @@ def logout(request):
 @permission_classes([IsAuthenticated])
 def user_profile(request):
     if request.method == 'GET':
-        serializer = UserProfileSerializer(request.user)
+        serializer = UserProfileSerializer(request.user, context={'request': request})
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+        serializer = UserProfileSerializer(request.user, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
