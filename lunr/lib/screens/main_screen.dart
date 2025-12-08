@@ -282,7 +282,10 @@ class _MainScreenState extends State<MainScreen> {
             context,
             icon: 'assets/icons/lunr_profile_icon.png',
             title: 'Profile',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileSettingsScreen())),
+            onTap: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileSettingsScreen()));
+              _loadUserProfile();
+            },
           ),
           _buildDrawerItem(
             context,

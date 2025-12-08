@@ -319,8 +319,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     child: CircleAvatar(
                       radius: 60,
                       backgroundColor: theme.primaryColor.withOpacity(0.1),
-                      backgroundImage: _currentUser?.avatar != null ? NetworkImage(_currentUser!.avatar!) : null,
-                      child: _currentUser?.avatar == null 
+                      backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.isNotEmpty) ? NetworkImage(_currentUser!.avatar!) : null,
+                      child: (_currentUser?.avatar == null || _currentUser!.avatar!.isEmpty) 
                         ? Text(
                             (_currentUser?.username ?? 'U')[0].toUpperCase(),
                             style: GoogleFonts.outfit(

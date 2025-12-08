@@ -53,6 +53,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Manually construct absolute URL for avatar if it exists
+        if instance.avatar:
+            request = self.context.get('request')
+            if request:
+                ret['avatar'] = request.build_absolute_uri(instance.avatar.url)
+        return ret
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     
