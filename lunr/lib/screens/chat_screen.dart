@@ -4,6 +4,8 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import '../models/message.dart';
+import '../models/chat_room.dart';
+import '../models/contact.dart';
 import '../services/database_service.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -35,12 +37,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final SocketService _socketService = SocketService();
   final DatabaseService _databaseService = DatabaseService();
 
-  // Selection Mode
-  Set<String> _selectedMessageIds = {};
-  bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
-
-  // Handler reference for removal
-  late Function(dynamic) _messageHandler;
+  ChatRoom? _chatRoom;
+  List<Contact> _contacts = []; // For add member dialog
 
   @override
   void initState() {
@@ -53,6 +51,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (userId != null) {
       _currentUserId = userId;
       
+      // Fetch Room Details
+      final room = await _apiService.getChatRoom(await _authService.getToken() ?? '', widget.roomId);
+      if (mounted) setState(() => _chatRoom = room);
+
       // Mark as read immediately
       _apiService.markChatRead(await _authService.getToken() ?? '', widget.roomId);
       _databaseService.markRoomAsRead(widget.roomId);
@@ -94,17 +96,219 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Group Management Methods
+  void _showGroupMenu() {
+    if (_chatRoom == null || !_chatRoom!.isGroup) return;
+    
+    final bool isAdmin = _chatRoom!.members.any((m) => m.user.id == _currentUserId && m.role == 'admin');
+
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Group Options', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 20),
+            ListTile(
+              leading: Icon(Icons.people),
+              title: Text('View Members (${_chatRoom!.memberCount})'),
+              onTap: () {
+                Navigator.pop(context);
+                _showMembersDialog(isAdmin);
+              },
+            ),
+            if (isAdmin)
+              ListTile(
+                leading: Icon(Icons.person_add),
+                title: Text('Add Members'),
+                onTap: () {
+                   Navigator.pop(context);
+                   _showAddMembersDialog();
+                },
+              ),
+            ListTile(
+              leading: Icon(Icons.exit_to_app, color: Colors.red),
+              title: Text('Exit Group', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmExitGroup();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMembersDialog(bool isAdmin) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Members'),
+        content: Container(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _chatRoom?.members.length ?? 0,
+            itemBuilder: (context, index) {
+              final member = _chatRoom!.members[index];
+              return ListTile(
+                title: Text(member.user.username),
+                subtitle: Text(member.role),
+                trailing: (isAdmin && member.user.id != _currentUserId) 
+                  ? PopupMenuButton(
+                      itemBuilder: (context) => [
+                        if (member.role != 'admin')
+                          PopupMenuItem(
+                            value: 'promote',
+                            child: Text('Promote to Admin'),
+                          ),
+                        if (member.role == 'admin')
+                          PopupMenuItem(
+                            value: 'demote',
+                            child: Text('Demote to Member'),
+                          ),
+                        PopupMenuItem(
+                          value: 'remove',
+                          child: Text('Remove from Group', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                      onSelected: (value) => _handleMemberAction(member.user.id, value.toString()),
+                    )
+                  : null,
+              );
+            },
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Close'))],
+      ),
+    );
+  }
+
+  Future<void> _handleMemberAction(int userId, String action) async {
+    final token = await _authService.getToken();
+    if (token == null) return;
+
+    bool success = false;
+    if (action == 'remove') {
+      success = await _apiService.removeMember(token, widget.roomId, userId);
+    } else if (action == 'promote') {
+      success = await _apiService.updateMemberRole(token, widget.roomId, userId, 'admin');
+    } else if (action == 'demote') {
+      success = await _apiService.updateMemberRole(token, widget.roomId, userId, 'member');
+    }
+
+    if (success) {
+      // Refresh room details
+      final updatedRoom = await _apiService.getChatRoom(token, widget.roomId);
+      if (mounted) setState(() => _chatRoom = updatedRoom);
+      Navigator.pop(context); // Close members list to refresh or just setState
+      // Re-open list? Or just toast.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action successful')));
+    }
+  }
+
+  void _showAddMembersDialog() {
+     // Load contacts
+     _databaseService.getContacts().then((contacts) {
+       if (mounted) setState(() => _contacts = contacts);
+     });
+     
+     Set<int> selectedIds = {};
+
+     showDialog(
+       context: context,
+       builder: (context) => StatefulBuilder(
+         builder: (context, setState) => AlertDialog(
+           title: Text('Add Members'),
+           content: Container(
+             width: double.maxFinite,
+             child: ListView.builder(
+               shrinkWrap: true,
+               itemCount: _contacts.length,
+               itemBuilder: (context, index) {
+                 final contact = _contacts[index];
+                 // Filter already members
+                 if (_chatRoom!.members.any((m) => m.user.id == contact.user.id)) return SizedBox.shrink();
+
+                 final isSelected = selectedIds.contains(contact.user.id);
+                 return CheckboxListTile(
+                   value: isSelected,
+                   title: Text(contact.alias.isNotEmpty ? contact.alias : contact.user.username),
+                   onChanged: (val) {
+                     setState(() {
+                       if (val == true) selectedIds.add(contact.user.id);
+                       else selectedIds.remove(contact.user.id);
+                     });
+                   },
+                 );
+               },
+             ),
+           ),
+           actions: [
+             TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+             TextButton(
+               onPressed: () async {
+                  final token = await _authService.getToken();
+                  if (token != null && selectedIds.isNotEmpty) {
+                    await _apiService.addMembers(token, widget.roomId, selectedIds.toList());
+                    final updatedRoom = await _apiService.getChatRoom(token, widget.roomId);
+                    if (mounted) setState(() => _chatRoom = updatedRoom);
+                  }
+                  Navigator.pop(context);
+               },
+               child: Text('Add'),
+             ),
+           ],
+         ),
+       ),
+     );
+  }
+
+  Future<void> _confirmExitGroup() async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Exit Group?'),
+        content: Text('Are you sure you want to leave this group?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Exit', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (confirm) {
+      final token = await _authService.getToken();
+      if (token != null) {
+        bool success = await _apiService.removeMember(token, widget.roomId, _currentUserId);
+        if (success) {
+          Navigator.pop(context); // Leave chat screen
+        } else {
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to exit group')));
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     _socketService.activeRoomId = null; // Clear active room
     _socketService.leaveRoom(widget.roomId);
-    if (this._currentUserId != null) { // Safe check if initialized
+    // if (this._currentUserId != null) { // ERROR: _currentUserId is not nullable int, it's late int. 
+    // Need to check if initialized or use try-catch
        try {
          _socketService.offMessage(_messageHandler);
        } catch (e) {
          // Handler might not have been assigned if init failed
        }
-    }
+    // }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -259,7 +463,23 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           )
-        : AppBar(title: Text(widget.roomName)),
+        : AppBar(
+            title: Text(widget.roomName),
+            actions: [
+              if (_chatRoom?.isGroup == true)
+                IconButton(
+                  icon: Container(
+                    padding: EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Icon(Icons.add, size: 16),
+                  ),
+                  onPressed: _showGroupMenu,
+                )
+            ],
+          ),
       body: Column(
         children: [
           Expanded(

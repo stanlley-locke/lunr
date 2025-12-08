@@ -242,6 +242,87 @@ def mark_room_read(request, room_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def room_members(request, room_id):
+    room = get_object_or_404(ChatRoom, id=room_id, members=request.user)
+    
+    if request.method == 'POST':
+        user_ids = request.data.get('user_ids', [])
+        added_users = []
+        
+        for uid in user_ids:
+            try:
+                user = User.objects.get(id=int(uid))
+                if not room.members.filter(id=user.id).exists():
+                    RoomMembership.objects.create(user=user, room=room, role='member')
+                    added_users.append(user.username)
+            except (User.DoesNotExist, ValueError):
+                pass
+        
+        if added_users:
+             Message.objects.create(
+                room=room,
+                sender=request.user,
+                content=f'Added {", ".join(added_users)} to the group',
+                message_type='system' 
+            )
+            
+        return Response({'message': f'Added {len(added_users)} members'})
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def room_member_detail(request, room_id, user_id):
+    room = get_object_or_404(ChatRoom, id=room_id, members=request.user)
+    requester_membership = RoomMembership.objects.get(user=request.user, room=room)
+    
+    target_user = get_object_or_404(User, id=user_id)
+    target_membership = get_object_or_404(RoomMembership, user=target_user, room=room)
+
+    if request.method == 'PUT':
+        if requester_membership.role != 'admin':
+             return Response({'error': 'Only admins can change roles'}, status=403)
+        
+        new_role = request.data.get('role')
+        if new_role in ['admin', 'member']:
+            target_membership.role = new_role
+            target_membership.save()
+            return Response({'message': f'User role updated to {new_role}'})
+        return Response({'error': 'Invalid role'}, status=400)
+
+    elif request.method == 'DELETE':
+        if request.user.id == user_id:
+            # Leaving
+            if room.room_type == 'group' and target_membership.role == 'admin':
+                 other_admins = RoomMembership.objects.filter(room=room, role='admin').exclude(user=request.user)
+                 if not other_admins.exists():
+                     next_member = RoomMembership.objects.filter(room=room).exclude(user=request.user).first()
+                     if next_member:
+                         next_member.role = 'admin'
+                         next_member.save()
+                     else:
+                         room.delete()
+                         return Response({'message': 'Room deleted as last member left'})
+            
+            target_membership.delete()
+            return Response({'message': 'You left the group'})
+        
+        else:
+            # Kicking
+            if requester_membership.role != 'admin':
+                return Response({'error': 'Only admins can remove members'}, status=403)
+            
+            target_membership.delete()
+            
+            Message.objects.create(
+                room=room,
+                sender=request.user,
+                content=f'Removed {target_user.username} from the group',
+                message_type='system' 
+            )
+
+            return Response({'message': 'User removed from group'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def send_message(request):
     room_id = request.data.get('room_id')
     content = request.data.get('content')

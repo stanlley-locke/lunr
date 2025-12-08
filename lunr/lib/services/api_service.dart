@@ -163,9 +163,68 @@ class ApiService {
 
   Future<bool> markChatRead(String token, String roomId) async {
     try {
-       final response = await http.post(
+      final response = await http.post(
         Uri.parse('$_baseUrl/rooms/$roomId/read/'),
         headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<ChatRoom?> getChatRoom(String token, String roomId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/rooms/$roomId/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        return ChatRoom.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> addMembers(String token, String roomId, List<int> userIds) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/members/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'user_ids': userIds}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> removeMember(String token, String roomId, int userId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/rooms/$roomId/members/$userId/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> updateMemberRole(String token, String roomId, int userId, String role) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/rooms/$roomId/members/$userId/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode({'role': role}),
       );
       return response.statusCode == 200;
     } catch (e) {

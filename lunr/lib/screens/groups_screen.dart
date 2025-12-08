@@ -24,11 +24,18 @@ class _GroupsScreenState extends State<GroupsScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _loadUserId();
     _loadGroups();
+  }
+
+  Future<void> _loadUserId() async {
+    final id = await _authService.getUserId();
+    if (mounted) setState(() => _currentUserId = id);
   }
 
   Future<void> _loadGroups({bool forceRefresh = false}) async {
@@ -66,6 +73,48 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
   Future<void> _handleRefresh() async {
     await _loadGroups(forceRefresh: true);
+  }
+
+  void _showGroupOptions(ChatRoom group) {
+    if (_currentUserId == null) return;
+    
+    final bool isAdmin = group.members.any((m) => m.user.id == _currentUserId && m.role == 'admin');
+    final String actionText = isAdmin ? 'Delete Group' : 'Leave Group';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Group Options'),
+        content: Text('Do you want to ${actionText.toLowerCase()} "${group.displayName}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+               Navigator.pop(context);
+               final token = await _authService.getToken();
+               if (token != null) {
+                  bool success = false;
+                  if (isAdmin) {
+                    // Delete Room
+                    success = await _apiService.deleteChatRoom(token, group.id);
+                  } else {
+                    // Leave Group
+                    success = await _apiService.removeMember(token, group.id, _currentUserId!);
+                  }
+                  
+                  if (success) {
+                    _loadGroups(forceRefresh: true);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Success')));
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed')));
+                  }
+               }
+            },
+            child: Text(actionText, style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

@@ -10,6 +10,7 @@ from .views import (
     # Chat Rooms
     # Chat Rooms
     chat_rooms, chat_room_detail, room_messages, mark_room_read,
+    room_members, room_member_detail,
     
     # Contacts
     contacts, contact_detail,
@@ -43,6 +44,8 @@ urlpatterns = [
     path('rooms/<uuid:room_id>/', chat_room_detail, name='chat_room_detail'),
     path('rooms/<uuid:room_id>/messages/', room_messages, name='room_messages'),
     path('rooms/<uuid:room_id>/read/', mark_room_read, name='mark_room_read'),
+    path('rooms/<uuid:room_id>/members/', room_members, name='room_members'),
+    path('rooms/<uuid:room_id>/members/<int:user_id>/', room_member_detail, name='room_member_detail'),
     
     # Contacts
     path('contacts/', contacts, name='contacts'),
