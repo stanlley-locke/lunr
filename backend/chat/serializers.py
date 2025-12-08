@@ -117,7 +117,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = [
             'id', 'notification_type', 'title', 'body',
-            'data', 'is_read', 'created_at'
+            'data', 'is_read', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 class ContactSerializer(serializers.ModelSerializer):
