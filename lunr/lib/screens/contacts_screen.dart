@@ -192,7 +192,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.contacts_outlined, size: 64, color: theme.disabledColor),
+                      Image.asset(
+                        'assets/icons/lunr_contacts_icon.png',
+                        width: 64,
+                        height: 64,
+                        color: theme.disabledColor,
+                      ),
                       SizedBox(height: 16),
                       Text('No contacts yet', style: theme.textTheme.titleMedium),
                     ],

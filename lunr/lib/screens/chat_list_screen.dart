@@ -289,7 +289,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.contacts, color: theme.iconTheme.color),
+                icon: Image.asset(
+                  'assets/icons/lunr_contacts_icon.png',
+                  width: 24,
+                  height: 24,
+                  color: theme.iconTheme.color,
+                ),
                 onPressed: () {
                   Navigator.push(
                     context,
