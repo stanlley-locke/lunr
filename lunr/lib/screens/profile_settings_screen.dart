@@ -321,7 +321,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                       radius: 60,
                       backgroundColor: theme.primaryColor.withOpacity(0.1),
                       backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
-                        ? CachedNetworkImageProvider(_currentUser!.avatar!) 
+                        ? NetworkImage(_currentUser!.avatar!) 
                         : null,
                       child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http')) 
                         ? Text(

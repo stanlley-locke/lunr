@@ -138,7 +138,7 @@ class _BlockedContactsScreenState extends State<BlockedContactsScreen> {
           radius: 24,
           backgroundColor: theme.primaryColor.withOpacity(0.1),
           backgroundImage: user.avatar != null && user.avatar!.isNotEmpty
-              ? CachedNetworkImageProvider(user.avatar!)
+              ? NetworkImage(user.avatar!)
               : null,
           child: user.avatar == null || user.avatar!.isEmpty
               ? Text(

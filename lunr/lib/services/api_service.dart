@@ -418,22 +418,7 @@ class ApiService {
     }
   }
 
-  // Privacy
-  Future<bool> blockUser(String token, int userId) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/privacy/block/'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json'
-        },
-        body: jsonEncode({'user_id': userId}),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
+
 
   // App Features
   Future<List<dynamic>> getUpdates(String token) async {

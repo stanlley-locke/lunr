@@ -249,7 +249,7 @@ class _MainScreenState extends State<MainScreen> {
                     radius: 32,
                     backgroundColor: theme.scaffoldBackgroundColor,
                     backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
-                      ? CachedNetworkImageProvider(_currentUser!.avatar!) 
+                      ? NetworkImage(_currentUser!.avatar!) 
                       : null,
                     child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http')) 
                       ? Text(

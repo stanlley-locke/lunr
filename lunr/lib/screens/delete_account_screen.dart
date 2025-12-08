@@ -143,12 +143,14 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               ],
             ),
             SizedBox(height: 24),
-            CustomButton(
-              text: 'Delete Account',
-              onPressed: _isConfirmed && !_isLoading ? _deleteAccount : null,
+            SizedBox(
               width: double.infinity,
-              color: Colors.red,
-              isLoading: _isLoading,
+              child: CustomButton(
+                text: 'Delete Account',
+                onPressed: _isConfirmed && !_isLoading ? () => _deleteAccount() : null,
+                backgroundColor: Colors.red,
+                isLoading: _isLoading,
+              ),
             ),
           ],
         ),

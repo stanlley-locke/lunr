@@ -101,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     radius: 30,
                     backgroundColor: theme.primaryColor,
                     backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
-                      ? CachedNetworkImageProvider(_currentUser!.avatar!) 
+                      ? NetworkImage(_currentUser!.avatar!) 
                       : null,
                     child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http'))
                       ? Text(

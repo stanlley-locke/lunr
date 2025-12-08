@@ -146,7 +146,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
               
               CustomButton(
                 text: 'Change Password',
-                onPressed: _isLoading ? null : _changePassword,
+                onPressed: _isLoading ? null : () => _changePassword(),
                 isLoading: _isLoading,
               ),
             ],
