@@ -39,6 +39,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   ChatRoom? _chatRoom;
   List<Contact> _contacts = []; // For add member dialog
+  
+  // Selection Mode
+  Set<String> _selectedMessageIds = {};
+  bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
+
+  // Handler reference for removal
+  late Function(dynamic) _messageHandler;
 
   @override
   void initState() {
@@ -468,13 +475,10 @@ class _ChatScreenState extends State<ChatScreen> {
             actions: [
               if (_chatRoom?.isGroup == true)
                 IconButton(
-                  icon: Container(
-                    padding: EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Icon(Icons.add, size: 16),
+                  icon: Image.asset(
+                    'assets/icons/lunr_plus_icon.png',
+                    width: 24,
+                    height: 24,
                   ),
                   onPressed: _showGroupMenu,
                 )

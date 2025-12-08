@@ -270,7 +270,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         title: 'Contacts',
         actions: [
           IconButton(
-            icon: Icon(Icons.add),
+            icon: Image.asset(
+              'assets/icons/lunr_plus_icon.png',
+              width: 24,
+              height: 24,
+            ),
             onPressed: () => _showAddContactDialog(),
           ),
         ],

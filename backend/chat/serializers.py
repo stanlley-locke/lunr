@@ -4,7 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .models import (
     User, Message, ChatRoom, RoomMembership, UserBlock, UserReport,
-    Notification, UserSettings, Update, Tool, MessageRead, Contact
+    Notification, UserSettings, Update, Tool, MessageRead, Contact, Media
 )
 
 class UserSerializer(serializers.ModelSerializer):
@@ -21,7 +21,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'avatar', 'bio', 'phone_number',
+            'id', 'username', 'email', 'avatar', 'bio', 'phone_number',
             'date_of_birth', 'status_message', 'is_verified'
         ]
         read_only_fields = ['id', 'username', 'is_verified']
@@ -119,6 +119,13 @@ class NotificationSerializer(serializers.ModelSerializer):
             'id', 'notification_type', 'title', 'body',
             'data', 'is_read', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+class MediaSerializer(serializers.ModelSerializer):
+    uploaded_by = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Media
+        fields = ['id', 'file', 'uploaded_by', 'media_type', 'created_at']
 
 class ContactSerializer(serializers.ModelSerializer):
     contact_user = UserSerializer(read_only=True)

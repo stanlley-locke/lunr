@@ -25,7 +25,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 5, // Bump version for Contacts
+      version: 6, // Bump version for Current User profile
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           try {
@@ -65,6 +65,18 @@ class DatabaseService {
             print('Migration (v5) error: $e');
           }
         }
+        if (oldVersion < 6) {
+          try {
+            await db.execute('''
+              CREATE TABLE current_user(
+                id INTEGER PRIMARY KEY,
+                json_data TEXT
+              )
+            ''');
+          } catch (e) {
+             print('Migration (v6) error: $e');
+          }
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -99,6 +111,13 @@ class DatabaseService {
             avatar TEXT,
             bio TEXT,
             created_at TEXT
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE current_user(
+            id INTEGER PRIMARY KEY,
+            json_data TEXT
           )
         ''');
       },
@@ -367,5 +386,44 @@ class DatabaseService {
   Future<void> deleteContact(int id) async {
     final db = await database;
     await db.delete('contacts', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Current User Profile ---
+
+  Future<void> saveCurrentUser(User user) async {
+    print('DEBUG: DatabaseService saving current user ${user.username}');
+    try {
+      final db = await database;
+      await db.insert(
+        'current_user',
+        {
+          'id': 1, // Always 1 for single user
+          'json_data': jsonEncode(user.toJson()),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+       print('ERROR: DatabaseService saveCurrentUser failed: $e');
+    }
+  }
+
+  Future<User?> getCurrentUser() async {
+    print('DEBUG: DatabaseService fetching current user');
+    try {
+      final db = await database;
+       // Check if table exists (in case migration failed or old DB)
+      final tables = await db.query('sqlite_master', where: 'name = ?', whereArgs: ['current_user']);
+      if (tables.isEmpty) return null;
+
+      final maps = await db.query('current_user', where: 'id = ?', whereArgs: [1]);
+      if (maps.isNotEmpty) {
+        final jsonStr = maps.first['json_data'] as String;
+        return User.fromJson(jsonDecode(jsonStr));
+      }
+      return null;
+    } catch (e) {
+      print('ERROR: DatabaseService getCurrentUser failed: $e');
+      return null;
+    }
   }
 }

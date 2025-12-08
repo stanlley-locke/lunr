@@ -68,8 +68,10 @@ class ApiService {
       if (response.statusCode == 200) {
         return User.fromJson(jsonDecode(response.body));
       }
+      print('getProfile failed: ${response.statusCode} - ${response.body}');
       return null;
     } catch (e) {
+      print('getProfile error: $e');
       return null;
     }
   }

@@ -25,7 +25,10 @@ from .views import (
     notifications, mark_notification_read,
     
     # App Features
-    updates, tools, report_user
+    updates, tools, report_user,
+    
+    # Media
+    FileUploadView
 )
 
 urlpatterns = [
@@ -70,4 +73,7 @@ urlpatterns = [
     path('updates/', updates, name='updates'),
     path('tools/', tools, name='tools'),
     path('report/', report_user, name='report_user'),
+    
+    # Media
+    path('upload/', FileUploadView.as_view(), name='file_upload'),
 ]

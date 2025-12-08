@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 class User extends Equatable {
   final int id;
   final String username;
+  final String? email;
+  final String? phoneNumber;
   final String? avatar;
   final String bio;
   final String statusMessage;
@@ -16,6 +18,8 @@ class User extends Equatable {
   const User({
     required this.id,
     required this.username,
+    this.email,
+    this.phoneNumber,
     this.avatar,
     this.bio = '',
     this.statusMessage = '',
@@ -31,6 +35,8 @@ class User extends Equatable {
     return User(
       id: json['id'],
       username: json['username'],
+      email: json['email'],
+      phoneNumber: json['phone_number'],
       avatar: json['avatar'],
       bio: json['bio'] ?? '',
       statusMessage: json['status_message'] ?? '',
@@ -47,6 +53,8 @@ class User extends Equatable {
     return {
       'id': id,
       'username': username,
+      'email': email,
+      'phone_number': phoneNumber,
       'avatar': avatar,
       'bio': bio,
       'status_message': statusMessage,
@@ -62,6 +70,7 @@ class User extends Equatable {
   User copyWith({
     int? id,
     String? username,
+    String? email,
     String? avatar,
     String? bio,
     String? statusMessage,
@@ -75,6 +84,7 @@ class User extends Equatable {
     return User(
       id: id ?? this.id,
       username: username ?? this.username,
+      email: email ?? this.email,
       avatar: avatar ?? this.avatar,
       bio: bio ?? this.bio,
       statusMessage: statusMessage ?? this.statusMessage,
@@ -89,7 +99,7 @@ class User extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, username, avatar, bio, statusMessage, onlineStatus, 
+    id, username, email, avatar, bio, statusMessage, onlineStatus, 
     lastSeen, isVerified, showLastSeen, showReadReceipts, showProfilePhoto
   ];
 }

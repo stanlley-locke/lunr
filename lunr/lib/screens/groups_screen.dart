@@ -11,8 +11,13 @@ import 'chat_screen.dart';
 
 class GroupsScreen extends StatefulWidget {
   final VoidCallback? onMenuPressed;
+  final Function(int)? onUnreadCountChanged;
 
-  const GroupsScreen({Key? key, this.onMenuPressed}) : super(key: key);
+  const GroupsScreen({
+    Key? key,
+    this.onMenuPressed,
+    this.onUnreadCountChanged,
+  }) : super(key: key);
 
   @override
   _GroupsScreenState createState() => _GroupsScreenState();
@@ -63,6 +68,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
             _groups = remoteRooms.where((room) => room.isGroup).toList();
             _isLoading = false;
           });
+          
+          final int unreadCount = _groups.fold(0, (sum, room) => sum + room.unreadCount);
+          widget.onUnreadCountChanged?.call(unreadCount);
         }
       }
     } catch (e) {
@@ -257,6 +265,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
+          onLongPress: () => _showGroupOptions(group),
           onTap: () {
             Navigator.push(
               context,
