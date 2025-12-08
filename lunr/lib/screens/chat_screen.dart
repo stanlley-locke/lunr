@@ -49,6 +49,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final userId = await _authService.getUserId();
     if (userId != null) {
       _currentUserId = userId;
+      
+      // Mark as read immediately
+      _apiService.markChatRead(await _authService.getToken() ?? '', widget.roomId);
+      _databaseService.markRoomAsRead(widget.roomId);
+
       await _loadMessages(forceRefresh: false); // Load local first
       
       // Initialize socket
@@ -63,6 +68,10 @@ class _ChatScreenState extends State<ChatScreen> {
           // Save to local DB
           await _databaseService.insertMessage(newMessage);
           
+          // If we receive a message while in the chat, mark it as read? 
+          // Ideally yes, but for now we rely on re-opening or manual triggers.
+          // Or we can call markRead here too if the user is "active".
+          
           setState(() {
             // Avoid duplicates if any
             if (!_messages.any((m) => m.id == newMessage.id)) {
@@ -76,7 +85,9 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       
       // Sync in background after local load
-      _loadMessages(forceRefresh: true); 
+      await _loadMessages(forceRefresh: true);
+      // Mark read again after sync to be sure
+      _apiService.markChatRead(await _authService.getToken() ?? '', widget.roomId);
     }
   }
 

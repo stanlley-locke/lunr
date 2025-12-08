@@ -384,14 +384,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Widget _buildChatTile(ChatRoom room, ThemeData theme, bool isSelected) {
     // Determine dynamic title
+    // Determine dynamic title
     String title = room.name;
     if (_currentUserId != null) {
       title = room.getDisplayName(_currentUserId!);
-      // DEBUG LOG
-      // print('DEBUG: Room ${room.id} Title: $title (Current User: $_currentUserId)');
     } else {
-      print('DEBUG: _currentUserId is NULL, using raw name: ${room.name}');
+      // Fallback to model's best guess if we don't know who we are yet
+      title = room.displayName;
     }
+    
+    // Safety check for empty name
+    if (title.isEmpty) title = 'Chat';
 
     return Container(
       decoration: BoxDecoration(

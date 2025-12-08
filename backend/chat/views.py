@@ -199,6 +199,26 @@ def room_messages(request, room_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def mark_room_read(request, room_id):
+    room = get_object_or_404(ChatRoom, id=room_id, members=request.user)
+    # Efficiently find messages not read by user
+    # We want messages in this room, NOT sent by user, that do NOT have a MessageRead for this user
+    unread_messages = Message.objects.filter(
+        room=room
+    ).exclude(
+        sender=request.user
+    ).exclude(
+        messageread__user=request.user
+    )
+    
+    # Bulk create MessageRead objects
+    reads = [MessageRead(message=msg, user=request.user) for msg in unread_messages]
+    MessageRead.objects.bulk_create(reads, ignore_conflicts=True)
+    
+    return Response({'message': 'Messages marked as read', 'count': len(reads)})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def send_message(request):
     room_id = request.data.get('room_id')
     content = request.data.get('content')

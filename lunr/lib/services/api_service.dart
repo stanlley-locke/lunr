@@ -160,6 +160,18 @@ class ApiService {
     }
   }
 
+  Future<bool> markChatRead(String token, String roomId) async {
+    try {
+       final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/read/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Messages
   Future<List<Message>> getRoomMessages(String token, String roomId) async {
     final response = await http.get(

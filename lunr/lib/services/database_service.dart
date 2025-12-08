@@ -264,4 +264,14 @@ class DatabaseService {
       whereArgs: [messageId],
     );
   }
+
+  Future<void> markRoomAsRead(String roomId) async {
+    final db = await database;
+    await db.update(
+      'chat_rooms',
+      {'unread_count': 0},
+      where: 'id = ?',
+      whereArgs: [roomId],
+    );
+  }
 }
