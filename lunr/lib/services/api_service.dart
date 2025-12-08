@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../models/chat_room.dart';
@@ -455,6 +456,34 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
+    }
+  }
+
+  // Media
+  Future<String?> uploadMedia(String token, File file, {String mediaType = 'file'}) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/upload/'));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['media_type'] = mediaType;
+      
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+      ));
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return data['url'];
+      } else {
+        print('Upload failed: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Upload error: $e');
+      return null;
     }
   }
 }

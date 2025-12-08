@@ -26,6 +26,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'username', 'is_verified']
 
+    # Explicitly define avatar as CharField to allow updating with a URL string
+    avatar = serializers.CharField(required=False, allow_null=True)
+
+    def update(self, instance, validated_data):
+        avatar = validated_data.pop('avatar', None)
+        
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            
+        # Handle avatar
+        if avatar is not None:
+             # If it's a URL string from our own media endpoint, we might want to store the relative path
+             # or just the Full URL if the field allows it.
+             # User.avatar is an ImageField.
+             # Django ImageField stores the path relative to MEDIA_ROOT.
+             # If we receive "http://.../media/uploads/file.jpg", we want "uploads/file.jpg"
+             
+             # Simple logic: if it contains '/media/', strip it.
+             if '/media/' in avatar:
+                 instance.avatar = avatar.split('/media/')[-1]
+             else:
+                 instance.avatar = avatar
+        
+        instance.save()
+        return instance
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'dart:io';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../services/auth_service.dart';
@@ -73,6 +76,78 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       print('Error loading network profile: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (pickedFile != null) {
+      _cropImage(pickedFile.path);
+    }
+  }
+
+  Future<void> _cropImage(String filePath) async {
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: filePath,
+      aspectRatio: CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Edit Photo',
+          toolbarColor: Theme.of(context).primaryColor,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(
+          title: 'Edit Photo',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+        ),
+      ],
+    );
+
+    if (croppedFile != null) {
+      await _uploadImage(File(croppedFile.path));
+    }
+  }
+
+  Future<void> _uploadImage(File file) async {
+    if (_currentUser == null) return;
+    
+    setState(() => _isSaving = true);
+    try {
+      final token = await _authService.getToken();
+      if (token != null) {
+        // 1. Upload Image
+        final imageUrl = await _apiService.uploadMedia(token, file, mediaType: 'image');
+        
+        if (imageUrl != null) {
+           // 2. Update Profile with new Avatar URL
+           final updatedUser = await _apiService.updateProfile(token, {
+             'username': _currentUser!.username, // Keep existing
+             'avatar': imageUrl,
+           });
+           
+           if (mounted && updatedUser != null) {
+             setState(() => _currentUser = updatedUser);
+             await _databaseService.saveCurrentUser(updatedUser);
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text('Profile photo updated successfully')),
+             );
+           }
+        } else {
+           throw Exception('Upload failed');
+        }
+      }
+    } catch (e) {
+      print('Upload error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload photo')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -261,10 +336,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     bottom: 0,
                     right: 0,
                     child: InkWell(
-                      onTap: () {
-                          // TODO: Implement image picker
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Photo update coming soon!')));
-                      },
+                      onTap: _pickImage,
                       child: Container(
                         padding: EdgeInsets.all(10),
                         decoration: BoxDecoration(
