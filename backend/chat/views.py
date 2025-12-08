@@ -154,7 +154,26 @@ def chat_rooms(request):
                 created_by=request.user,
                 is_private=data.get('is_private', False)
             )
+            # Add creator as admin
             RoomMembership.objects.create(user=request.user, room=room, role='admin')
+            
+            # Add other members
+            members_ids = data.get('members', [])
+            for member_id in members_ids:
+                try:
+                    user = User.objects.get(id=int(member_id))
+                    if user != request.user:
+                        RoomMembership.objects.get_or_create(user=user, room=room, role='member')
+                except (User.DoesNotExist, ValueError):
+                    pass
+            
+            # Create initial system/welcome message
+            Message.objects.create(
+                room=room,
+                sender=request.user,
+                content=f'Group "{room.name}" created',
+                message_type='system' 
+            )
         
         return Response(ChatRoomSerializer(room).data, status=201)
 

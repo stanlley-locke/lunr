@@ -139,7 +139,7 @@ class ApiService {
       
       print('Room creation response: ${response.statusCode} - ${response.body}');
       
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         return ChatRoom.fromJson(jsonDecode(response.body));
       }
       return null;
@@ -331,20 +331,16 @@ class ApiService {
 
   // Contacts
   Future<List<Contact>> getContacts(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/contacts/'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => Contact.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
+    final response = await http.get(
+      Uri.parse('$_baseUrl/contacts/'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Contact.fromJson(json)).toList();
     }
+    throw Exception('Failed to load contacts: ${response.statusCode}');
   }
 
   Future<Contact?> addContact(String token, String username) async {

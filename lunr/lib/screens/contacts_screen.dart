@@ -55,30 +55,49 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
   }
 
-  Future<void> _loadContacts() async {
-    // Load local first
-    final localContacts = await _databaseService.getContacts();
-    if (mounted) {
-      setState(() {
-        _contacts = localContacts;
-        _filterContacts();
-        _isLoading = false;
-      });
-    }
-
-    // Sync remote
-    final token = await _authService.getToken();
-    if (token != null) {
-      final remoteContacts = await _apiService.getContacts(token);
-      await _databaseService.insertContacts(remoteContacts);
+  Future<void> _loadContacts({bool forceRefresh = false}) async {
+    // If not forcing refresh, always load local first for speed
+    if (!forceRefresh) {
+      final localContacts = await _databaseService.getContacts();
       if (mounted) {
         setState(() {
-          _contacts = remoteContacts;
+          _contacts = localContacts;
           _filterContacts();
-          _isLoading = false;
+          if (_contacts.isNotEmpty) _isLoading = false;
         });
       }
     }
+
+    // Sync remote
+    try {
+      final token = await _authService.getToken();
+      if (token != null) {
+        final remoteContacts = await _apiService.getContacts(token);
+        
+        // Update local DB
+        await _databaseService.insertContacts(remoteContacts);
+        
+        if (mounted) {
+          setState(() {
+            _contacts = remoteContacts;
+            _filterContacts();
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading contacts: $e');
+      // If we failed to load remote, just ensure we aren't stuck in loading state
+      if (mounted) {
+         setState(() {
+           _isLoading = false;
+         });
+      }
+    }
+  }
+  
+  Future<void> _handleRefresh() async {
+    await _loadContacts(forceRefresh: true);
   }
 
   Future<void> _startChat(Contact contact) async {
@@ -252,7 +271,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.add),
-            onPressed: _showAddContactDialog,
+            onPressed: () => _showAddContactDialog(),
           ),
         ],
       ),
@@ -279,32 +298,53 @@ class _ContactsScreenState extends State<ContactsScreen> {
           
           // Contact List
           Expanded(
-            child: _isLoading
+            child: _isLoading && _contacts.isEmpty
               ? Center(child: CircularProgressIndicator())
-              : _filteredContacts.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            'assets/icons/lunr_contacts_icon.png',
-                            width: 64,
-                            height: 64,
-                          ),
-                          SizedBox(height: 16),
-                          Text('No contacts found', style: theme.textTheme.titleMedium),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: _filteredContacts.length,
-                      separatorBuilder: (ctx, index) => SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final contact = _filteredContacts[index];
-                        return _buildContactTile(contact, theme);
-                      },
-                    ),
+              : RefreshIndicator(
+                  onRefresh: _handleRefresh,
+                  color: theme.primaryColor,
+                  child: _filteredContacts.isEmpty
+                      ? ListView(
+                          physics: AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(height: 100),
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(
+                                    'assets/icons/lunr_contacts_icon.png',
+                                    width: 64,
+                                    height: 64,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(_searchQuery.isEmpty ? 'No contacts yet' : 'No contacts found', 
+                                    style: theme.textTheme.titleMedium
+                                  ),
+                                  if (_searchQuery.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Text(
+                                        'Add people to start chatting!',
+                                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          physics: AlwaysScrollableScrollPhysics(),
+                          itemCount: _filteredContacts.length,
+                          separatorBuilder: (ctx, index) => SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final contact = _filteredContacts[index];
+                            return _buildContactTile(contact, theme);
+                          },
+                        ),
+                ),
           ),
         ],
       ),

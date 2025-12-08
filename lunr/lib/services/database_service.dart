@@ -326,14 +326,36 @@ class DatabaseService {
   }
   
   Future<List<Contact>> getContacts() async {
-    final db = await database;
-    final maps = await db.query('contacts', orderBy: 'alias ASC');
-    return List.generate(maps.length, (i) {
-      return Contact.fromMap(maps[i]);
-    });
+    print('DEBUG: DatabaseService fetching contacts');
+    try {
+      final db = await database;
+      // Check if table exists
+      final tables = await db.query('sqlite_master', where: 'name = ?', whereArgs: ['contacts']);
+      if (tables.isEmpty) {
+        print('DEBUG: Contacts table does not exist yet');
+        return [];
+      }
+
+      final maps = await db.query('contacts', orderBy: 'alias ASC');
+      print('DEBUG: DatabaseService found ${maps.length} contacts');
+      
+      final List<Contact> contacts = [];
+      for (var map in maps) {
+        try {
+          contacts.add(Contact.fromMap(map));
+        } catch (e) {
+          print('ERROR: Failed to parse contact ${map['id']}: $e');
+        }
+      }
+      return contacts;
+    } catch (e) {
+      print('ERROR: DatabaseService getContacts failed: $e');
+      return [];
+    }
   }
   
   Future<void> insertContact(Contact contact) async {
+    print('DEBUG: Inserting contact ${contact.user.username}');
     final db = await database;
     await db.insert(
       'contacts',
