@@ -25,16 +25,62 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> with SingleTi
   bool _backupChats = true;
   bool _isProcessing = false;
 
+  List<dynamic> _cloudBackups = [];
+  bool _loadingBackups = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadCloudBackups();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCloudBackups() async {
+    if (!mounted) return;
+    setState(() => _loadingBackups = true);
+    final token = await _authService.getToken();
+    if (token != null) {
+      final backups = await _apiService.getCloudBackups(token);
+      if (mounted) setState(() => _cloudBackups = backups);
+    }
+    if (mounted) setState(() => _loadingBackups = false);
+  }
+  
+  Future<void> _performCloudBackup() async {
+     setState(() => _isProcessing = true);
+     final token = await _authService.getToken();
+     if (token != null) {
+       final success = await _apiService.createCloudBackup(token);
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success ? 'Cloud backup created' : 'Failed to create backup')));
+         if (success) _loadCloudBackups();
+       }
+     }
+     if (mounted) setState(() => _isProcessing = false);
+  }
+  
+  Future<void> _restoreCloudBackup(String id) async {
+     setState(() => _isProcessing = true);
+     final token = await _authService.getToken();
+     if (token != null) {
+       final success = await _apiService.restoreCloudBackup(token, id);
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success ? 'Restore completed' : 'Restore failed')));
+     }
+     if (mounted) setState(() => _isProcessing = false);
+  }
+  
+  Future<void> _deleteCloudBackup(String id) async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      final success = await _apiService.deleteCloudBackup(token, id);
+      if (success) _loadCloudBackups();
+    }
   }
 
   Future<void> _performBackup() async {
@@ -66,12 +112,12 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> with SingleTi
              await FileSaver.instance.saveFile(name: '$name.json', bytes: bytes, mimeType: MimeType.json);
           }
           
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup saved successfully')));
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('File backup saved')));
         } catch (e) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving backup: $e')));
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving file: $e')));
         }
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to fetch backup data')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to fetch data')));
       }
     }
     
@@ -144,12 +190,38 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> with SingleTi
   }
 
   Widget _buildBackupTab(ThemeData theme) {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Select data to backup:', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          // Cloud Backup Section
+          Text('Cloud Backup', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('Save your data securely to the cloud.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor)),
+          SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isProcessing ? null : _performCloudBackup,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.primaryColor,
+                padding: EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: Icon(Icons.cloud_upload, color: Colors.white),
+              label: _isProcessing 
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text('Back Up Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+          
+          Divider(height: 48),
+          
+          // Local Backup Section
+          Text('Local File Backup', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('Select data to export to a file:', style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor)),
           SizedBox(height: 16),
           CheckboxListTile(
             title: Text('Settings'),
@@ -175,19 +247,18 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> with SingleTi
             onChanged: (v) => setState(() => _backupChats = v!),
             activeColor: theme.primaryColor,
           ),
-          Spacer(),
+          SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isProcessing ? null : _performBackup,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
+            child: OutlinedButton.icon(
+              onPressed: _isProcessing ? null : _performBackup, // This is the file backup
+              style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(color: theme.primaryColor),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: _isProcessing 
-                  ? CircularProgressIndicator(color: Colors.white)
-                  : Text('Create Backup', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              icon: Icon(Icons.save_alt, color: theme.primaryColor),
+              label: Text('Export to File', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.primaryColor)),
             ),
           ),
         ],
@@ -196,41 +267,64 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> with SingleTi
   }
 
   Widget _buildRestoreTab(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.restore_page_outlined, size: 80, color: theme.primaryColor),
-          SizedBox(height: 24),
-          Text(
-            'Restore from Backup',
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Select a previously generated backup file (.json) to restore your data.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.disabledColor),
-          ),
-          SizedBox(height: 48),
-          SizedBox(
+    return Column(
+      children: [
+        // Cloud Backups List
+        Expanded(
+          child: _loadingBackups 
+            ? Center(child: CircularProgressIndicator())
+            : _cloudBackups.isEmpty 
+                ? Center(child: Text('No cloud backups found', style: TextStyle(color: theme.disabledColor)))
+                : ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: _cloudBackups.length,
+                    itemBuilder: (context, index) {
+                      final backup = _cloudBackups[index];
+                      // Format date
+                      final dateStr = backup['created_at'] ?? '';
+                      // Size
+                      final size = backup['size_bytes'] ?? 0;
+                      final sizeStr = (size / 1024).toStringAsFixed(1) + ' KB';
+                      
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          leading: Icon(Icons.cloud_done, color: theme.primaryColor),
+                          title: Text('Backup: $dateStr'), // Enhance date formatting if time permits
+                          subtitle: Text('Size: $sizeStr'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.restore, color: Colors.green),
+                                onPressed: _isProcessing ? null : () => _restoreCloudBackup(backup['id']),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: _isProcessing ? null : () => _deleteCloudBackup(backup['id']),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+        ),
+        Divider(),
+        // Restore from File option
+        Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isProcessing ? null : _performRestore,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: Icon(Icons.upload_file, color: Colors.white),
-              label: _isProcessing 
-                  ? CircularProgressIndicator(color: Colors.white)
-                  : Text('Select Backup File', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            child: TextButton.icon(
+              onPressed: _isProcessing ? null : _performRestore, // Existing file restore method
+              icon: Icon(Icons.upload_file),
+              label: Text('Restore from Local File'),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

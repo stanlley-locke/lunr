@@ -31,7 +31,10 @@ from .views import (
     FileUploadView,
     
     # Backup & Archive
-    backup_data, restore_data, archive_chat, unarchive_chat
+    backup_data, restore_data, archive_chat, unarchive_chat,
+    
+    # Cloud Backup
+    create_cloud_backup, list_cloud_backups, restore_cloud_backup, delete_cloud_backup
 )
 
 urlpatterns = [
@@ -82,9 +85,15 @@ urlpatterns = [
     # Media
     path('upload/', FileUploadView.as_view(), name='file_upload'),
 
-    # Backup & Restore
+    # Backup & Restore (Legacy File)
     path('chat/backup/', backup_data, name='backup_data'),
     path('chat/restore/', restore_data, name='restore_data'),
+    
+    # Cloud Backup
+    path('cloud/backups/', list_cloud_backups, name='list_cloud_backups'),
+    path('cloud/backups/create/', create_cloud_backup, name='create_cloud_backup'),
+    path('cloud/backups/<uuid:backup_id>/restore/', restore_cloud_backup, name='restore_cloud_backup'),
+    path('cloud/backups/<uuid:backup_id>/delete/', delete_cloud_backup, name='delete_cloud_backup'),
 
     # Archiving
     path('rooms/<uuid:room_id>/archive/', archive_chat, name='archive_chat'),

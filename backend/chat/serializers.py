@@ -4,7 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .models import (
     User, Message, ChatRoom, RoomMembership, UserBlock, UserReport,
-    Notification, UserSettings, Update, Tool, MessageRead, Contact, Media
+    Notification, UserSettings, Update, Tool, MessageRead, Contact, Media, UserBackup
 )
 
 class UserSerializer(serializers.ModelSerializer):
@@ -129,6 +129,12 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         if last_msg:
             return MessageSerializer(last_msg).data
         return None
+
+class UserBackupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBackup
+        fields = ['id', 'created_at', 'size_bytes']
+        read_only_fields = ['id', 'created_at', 'size_bytes']
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)

@@ -482,6 +482,58 @@ class ApiService {
     }
   }
 
+  // Cloud Backup Methods
+  Future<bool> createCloudBackup(String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/cloud/backups/create/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<dynamic>> getCloudBackups(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/cloud/backups/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> restoreCloudBackup(String token, String backupId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/cloud/backups/$backupId/restore/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteCloudBackup(String token, String backupId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/cloud/backups/$backupId/delete/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // App Features
   Future<List<dynamic>> getUpdates(String token) async {
     try {

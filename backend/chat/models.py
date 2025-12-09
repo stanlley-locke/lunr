@@ -211,5 +211,19 @@ class Media(models.Model):
     media_type = models.CharField(max_length=10, choices=MEDIA_TYPES, default='file')
     created_at = models.DateTimeField(auto_now_add=True)
     
+    
     def __str__(self):
         return f"{self.media_type} by {self.uploaded_by.username} at {self.created_at}"
+
+class UserBackup(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, related_name='backups', on_delete=models.CASCADE)
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    size_bytes = models.IntegerField(default=0) # Helpful for UI
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Backup for {self.user.username} at {self.created_at}"
