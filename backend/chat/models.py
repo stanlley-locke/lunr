@@ -55,6 +55,7 @@ class RoomMembership(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
     is_muted = models.BooleanField(default=False)
     last_read_message = models.ForeignKey('Message', null=True, blank=True, on_delete=models.SET_NULL)
+    is_archived = models.BooleanField(default=False)
     
     class Meta:
         unique_together = ['user', 'room']
