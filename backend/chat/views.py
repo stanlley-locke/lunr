@@ -781,6 +781,9 @@ def change_password(request):
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
+def delete_account(request):
+    user = request.user
+    user.delete()
     return Response({'message': 'Account deleted successfully'})
 
 @api_view(['GET'])
