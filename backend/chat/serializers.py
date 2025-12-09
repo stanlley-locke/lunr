@@ -98,7 +98,7 @@ class RoomMembershipSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = RoomMembership
-        fields = ['user', 'role', 'joined_at', 'is_muted']
+        fields = ['user', 'role', 'joined_at', 'is_muted', 'is_archived']
 
 class ChatRoomSerializer(serializers.ModelSerializer):
     members = RoomMembershipSerializer(source='roommembership_set', many=True, read_only=True)

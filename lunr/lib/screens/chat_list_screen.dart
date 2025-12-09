@@ -138,7 +138,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   void _filterRooms() {
     if (_searchQuery.isEmpty) {
-      _filteredRooms = List.from(_rooms);
+      if (_currentUserId != null) {
+        _filteredRooms = _rooms.where((r) => !r.isArchivedFor(_currentUserId!)).toList();
+      } else {
+        _filteredRooms = List.from(_rooms);
+      }
     } else {
       _filteredRooms = _rooms.where((room) {
         return room.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
