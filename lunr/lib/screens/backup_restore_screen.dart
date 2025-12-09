@@ -59,11 +59,11 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> with SingleTi
           String date = DateTime.now().toIso8601String().split('T')[0];
           String name = 'lunr_backup_$date';
           
-          // Save file (using positional args for compatibility)
+          // Save file (ext removed based on compilation feedback)
           if (Platform.isAndroid || Platform.isIOS) {
-             await FileSaver.instance.saveFile(name, bytes, 'json', mimeType: MimeType.json);
+             await FileSaver.instance.saveFile(name: '$name.json', bytes: bytes, mimeType: MimeType.json);
           } else {
-             await FileSaver.instance.saveFile(name, bytes, 'json', mimeType: MimeType.json);
+             await FileSaver.instance.saveFile(name: '$name.json', bytes: bytes, mimeType: MimeType.json);
           }
           
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup saved successfully')));

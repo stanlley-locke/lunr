@@ -788,8 +788,6 @@ def delete_account(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def backup_data(request):
     user = request.user
     include = request.query_params.get('include', 'all').split(',')
