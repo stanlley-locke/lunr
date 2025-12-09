@@ -949,7 +949,7 @@ def create_cloud_backup(request):
     
     backup_payload = {
         'timestamp': timezone.now().isoformat(),
-        'user_id': user.id,
+        'user_id': str(user.id),
     }
 
     # Profile
