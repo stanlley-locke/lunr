@@ -7,6 +7,7 @@ import '../models/message.dart';
 import '../models/chat_room.dart';
 import '../models/contact.dart';
 import '../services/database_service.dart';
+import '../models/user_settings.dart';
 
 class ChatScreen extends StatefulWidget {
   final String roomId;
@@ -46,11 +47,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // Handler reference for removal
   late Function(dynamic) _messageHandler;
+  
+  UserSettings? _userSettings;
 
   @override
   void initState() {
     super.initState();
     _initializeChat();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      final settings = await _apiService.getSettings(token);
+      if (mounted && settings != null) {
+        setState(() => _userSettings = settings);
+      }
+    }
   }
 
   void _initializeChat() async {
@@ -559,7 +573,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+            ),
         ],
+        ),
       ),
     );
   }

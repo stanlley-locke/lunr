@@ -11,6 +11,7 @@ import '../widgets/custom_app_bar.dart';
 import 'login_screen.dart';
 import 'chat_screen.dart';
 import 'contacts_screen.dart';
+import 'archived_chats_screen.dart';
 import '../services/socket_service.dart';
 import '../services/database_service.dart';
 import '../models/message.dart';
@@ -136,10 +137,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _filterRooms() {
+    if (_currentUserId == null) {
+      _filteredRooms = [];
+      return;
+    }
+
+    // Filter out archived chats
+    final activeRooms = _rooms.where((r) => !r.isArchivedFor(_currentUserId!)).toList();
+
     if (_searchQuery.isEmpty) {
-      _filteredRooms = List.from(_rooms);
+      _filteredRooms = activeRooms;
     } else {
-      _filteredRooms = _rooms.where((room) {
+      _filteredRooms = activeRooms.where((room) {
         return room.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                (room.lastMessage?.content ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
@@ -252,7 +261,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
 
     _clearSelection();
-    _loadContacts();
+    _loadChats();
+  }
+
+  Future<void> _archiveSelectedRooms() async {
+    final token = await _authService.getToken();
+    if (token == null) return;
+
+    setState(() => _isLoading = true);
+
+    int successCount = 0;
+    for (var roomId in _selectedRoomIds) {
+      final success = await _apiService.archiveChat(token, roomId);
+      if (success) successCount++;
+    }
+
+    _clearSelection();
+    _loadChats();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Archived $successCount chats')));
+    }
   }
 
   @override
@@ -269,6 +298,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
               onPressed: _clearSelection,
             ),
             actions: [
+              IconButton(
+                icon: Icon(Icons.archive, color: theme.iconTheme.color),
+                onPressed: _archiveSelectedRooms,
+              ),
               IconButton(
                 icon: Icon(Icons.delete, color: Colors.red),
                 onPressed: _deleteSelectedRooms,
@@ -305,25 +338,39 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
       body: Column(
         children: [
-          // Search Bar
-          if (!_isSelectionMode)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search chats...',
-                  prefixIcon: Icon(Icons.search),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                ),
-              ),
+                onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+                if (value.length > 2) {
+                  // Local search is already handled by _filterRooms
+                  // API search could be added here if desired
+                }
+              },
             ),
+            
+            // Archived Chats Button (only if not searching)
+            if (_searchQuery.isEmpty && !_isSelectionMode)
+              ListTile(
+                leading: Container(
+                   padding: EdgeInsets.all(8),
+                   decoration: BoxDecoration(
+                     color: theme.disabledColor.withOpacity(0.1),
+                     borderRadius: BorderRadius.circular(8),
+                   ),
+                   child: Icon(Icons.archive_outlined, size: 20, color: theme.disabledColor),
+                ),
+                title: Text('Archived', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                trailing: Text('${_rooms.where((r) => _currentUserId != null && r.isArchivedFor(_currentUserId!)).length}', style: TextStyle(color: theme.disabledColor)),
+                onTap: () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ArchivedChatsScreen()),
+                  ).then((_) => _loadChats());
+                },
+              ),
+          ],
+        ),
           
           // Chat List
           Expanded(

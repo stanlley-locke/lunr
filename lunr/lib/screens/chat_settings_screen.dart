@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_saver/file_saver.dart'; // For saving backup
+import 'dart:convert';
+import 'dart:typed_data';
+import '../models/user_settings.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../widgets/custom_button.dart';
 
 class ChatSettingsScreen extends StatefulWidget {
   @override
@@ -7,9 +14,112 @@ class ChatSettingsScreen extends StatefulWidget {
 }
 
 class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
-  bool _autoDownloadMedia = true;
-  bool _backupEnabled = false;
-  String _selectedTheme = 'Default';
+  final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService();
+  
+  bool _isLoading = true;
+  UserSettings? _settings;
+  
+  // Settings State
+  String _wallpaper = 'default';
+  int _fontSize = 14;
+  bool _mediaVisibility = true;
+  bool _autoDownload = true;
+  String _language = 'en';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      final settings = await _apiService.getSettings(token);
+      if (mounted && settings != null) {
+        setState(() {
+          _settings = settings;
+          _wallpaper = settings.wallpaper;
+          _fontSize = settings.fontSize;
+          _mediaVisibility = settings.mediaVisibility;
+          _autoDownload = settings.autoDownloadMedia;
+          _language = settings.language;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateSetting(String key, dynamic value) async {
+    if (_settings == null) return;
+    
+    // Optimistically update UI
+    setState(() {
+      if (key == 'wallpaper') _wallpaper = value;
+      if (key == 'fontSize') _fontSize = value;
+      if (key == 'mediaVisibility') _mediaVisibility = value;
+      if (key == 'autoDownload') _autoDownload = value;
+      if (key == 'language') _language = value;
+    });
+
+    final token = await _authService.getToken();
+    if (token != null) {
+      UserSettings newSettings;
+      // We need to verify which copyWith to call or just update the one field
+      // Currently our copyWith is robust
+      if (key == 'wallpaper') newSettings = _settings!.copyWith(wallpaper: value);
+      else if (key == 'fontSize') newSettings = _settings!.copyWith(fontSize: value);
+      else if (key == 'mediaVisibility') newSettings = _settings!.copyWith(mediaVisibility: value);
+      else if (key == 'autoDownload') newSettings = _settings!.copyWith(autoDownloadMedia: value);
+      else if (key == 'language') newSettings = _settings!.copyWith(language: value);
+      else newSettings = _settings!;
+
+      final updated = await _apiService.updateSettings(token, newSettings);
+      if (mounted && updated != null) {
+        setState(() => _settings = updated);
+      }
+    }
+  }
+
+  Future<void> _backupChats() async {
+    setState(() => _isLoading = true);
+    final token = await _authService.getToken();
+    if (token != null) {
+      final data = await _apiService.backupData(token);
+      if (data != null) {
+        // Create JSON file
+        try {
+          String jsonString = jsonEncode(data);
+          Uint8List bytes = Uint8List.fromList(utf8.encode(jsonString));
+          
+          await FileSaver.instance.saveFile(
+            name: 'lunr_backup_${DateTime.now().toIso8601String().replaceAll(':', '-')}',
+            bytes: bytes,
+            ext: 'json',
+            mimeType: MimeType.json,
+          );
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup downloaded successfully')));
+          }
+        } catch (e) {
+          print("Backup save error: $e");
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save backup file')));
+        }
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to generate backup')));
+      }
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _clearAllChats() async {
+    // Logic to clear chats would go here - for now just show a dialog
+    // This requires a backend endpoint "delete all chats" which we haven't built yet,
+    // or iterating through all rooms and deleting them.
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Clear All Chats coming soon')));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,292 +128,198 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        title: Text('Chat Settings', style: theme.textTheme.titleLarge),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: theme.iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Chats',
-          style: GoogleFonts.outfit(
-            color: theme.textTheme.bodyLarge?.color,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
-      body: ListView(
-        padding: EdgeInsets.all(24),
-        children: [
-          Text(
-            'Display',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.primaryColor,
-            ),
+      body: _isLoading 
+        ? Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: EdgeInsets.all(24),
+            children: [
+              _buildSectionHeader(theme, 'Display'),
+              _buildOption(
+                theme,
+                title: 'Wallpaper',
+                subtitle: _wallpaper == 'default' ? 'Default' : 'Custom',
+                icon: Icons.wallpaper,
+                onTap: () {
+                   // Ideally show a picker. For now toggle or show dialog
+                   _showWallpaperDialog(theme);
+                },
+              ),
+              _buildSliderOption(theme, 'Font Size', _fontSize.toDouble(), 10, 30, (val) {
+                _updateSetting('fontSize', val.toInt());
+              }),
+              _buildSwitchOption(theme, 'App Language', 'English', true, (val) {
+                 // Single language for now
+              }),
+              
+              SizedBox(height: 32),
+              _buildSectionHeader(theme, 'Media'),
+              _buildSwitchOption(
+                theme, 
+                'Media Visibility', 
+                'Show newly downloaded media in your device gallery', 
+                _mediaVisibility, 
+                (val) => _updateSetting('mediaVisibility', val)
+              ),
+              _buildSwitchOption(
+                theme, 
+                'Auto-Download Media', 
+                'Automatically download photos and videos', 
+                _autoDownload, 
+                (val) => _updateSetting('autoDownload', val)
+              ),
+
+              SizedBox(height: 32),
+              _buildSectionHeader(theme, 'Backup & History'),
+              _buildOption(
+                theme,
+                title: 'Chat Backup',
+                subtitle: 'Back up your chats and media',
+                icon: Icons.cloud_upload_outlined,
+                onTap: _backupChats,
+              ),
+              _buildOption(
+                theme,
+                title: 'Chat History',
+                subtitle: 'Clear all chats, Delete all chats',
+                icon: Icons.history,
+                onTap: () {
+                   // Sub-menu for Clear/Delete
+                   _showHistoryDialog(theme);
+                },
+              ),
+            ],
           ),
-          SizedBox(height: 16),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.wallpaper,
-            title: 'Wallpaper',
-            subtitle: 'Change chat background',
-            color: Color(0xFF6366F1), // Indigo
-            onTap: () {},
-          ),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.text_fields,
-            title: 'Font size',
-            subtitle: 'Small, Normal, Large, Extra Large',
-            color: Color(0xFF10B981), // Emerald
-            onTap: () {},
-          ),
-          
-          SizedBox(height: 32),
-          
-          Text(
-            'Media',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.primaryColor,
-            ),
-          ),
-          SizedBox(height: 16),
-          
-          _buildSwitchTile(
-            context,
-            icon: Icons.download,
-            title: 'Auto-download media',
-            subtitle: 'Automatically download photos and videos',
-            value: _autoDownloadMedia,
-            color: Color(0xFF3B82F6), // Blue
-            onChanged: (value) {
-              setState(() {
-                _autoDownloadMedia = value;
-              });
-            },
-          ),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.photo_library,
-            title: 'Media visibility',
-            subtitle: 'Show media in gallery',
-            color: Color(0xFFF59E0B), // Amber
-            onTap: () {},
-          ),
-          
-          SizedBox(height: 32),
-          
-          Text(
-            'Backup',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.primaryColor,
-            ),
-          ),
-          SizedBox(height: 16),
-          
-          _buildSwitchTile(
-            context,
-            icon: Icons.backup,
-            title: 'Chat backup',
-            subtitle: 'Back up your chats to cloud storage',
-            value: _backupEnabled,
-            color: Color(0xFF8B5CF6), // Violet
-            onChanged: (value) {
-              setState(() {
-                _backupEnabled = value;
-              });
-            },
-          ),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.history,
-            title: 'Chat history',
-            subtitle: 'Export, delete, or clear chat history',
-            color: Color(0xFFEF4444), // Red
-            onTap: () {},
-          ),
-          
-          SizedBox(height: 32),
-          
-          Text(
-            'Advanced',
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.primaryColor,
-            ),
-          ),
-          SizedBox(height: 16),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.archive,
-            title: 'Archived chats',
-            subtitle: 'View archived conversations',
-            color: Color(0xFF64748B), // Slate
-            onTap: () {},
-          ),
-          
-          _buildSettingsTile(
-            context,
-            icon: Icons.language,
-            title: 'App language',
-            subtitle: 'English (device language)',
-            color: Color(0xFFEC4899), // Pink
-            onTap: () {},
-          ),
-        ],
+    );
+  }
+
+  Widget _buildSectionHeader(ThemeData theme, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Text(
+        title,
+        style: GoogleFonts.outfit(
+          color: theme.primaryColor,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
 
-  Widget _buildSwitchTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required Color color,
-    required ValueChanged<bool> onChanged,
+  Widget _buildOption(ThemeData theme, {
+    required String title, required String subtitle, required IconData icon, required VoidCallback onTap
   }) {
-    final theme = Theme.of(context);
-    
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: SwitchListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        secondary: Container(
+      child: ListTile(
+        leading: Container(
           padding: EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: theme.primaryColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
+          child: Icon(icon, color: theme.primaryColor),
         ),
-        title: Text(
-          title,
-          style: GoogleFonts.outfit(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: theme.textTheme.bodyLarge?.color,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: GoogleFonts.inter(
-            color: theme.disabledColor,
-            fontSize: 12,
-          ),
-        ),
-        value: value,
-        onChanged: onChanged,
-        activeColor: theme.primaryColor,
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 12)),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: theme.disabledColor),
+        onTap: onTap,
       ),
     );
   }
-
-  Widget _buildSettingsTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    
+  
+  Widget _buildSwitchOption(ThemeData theme, String title, String subtitle, bool value, Function(bool) onChanged) {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SwitchListTile(
+        activeColor: theme.primaryColor,
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 12)),
+        value: value,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildSliderOption(ThemeData theme, String title, double value, double min, double max, Function(double) onChanged) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('${value.toInt()}', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: (max - min).toInt(),
+            activeColor: theme.primaryColor,
+            onChanged: onChanged,
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: color,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.outfit(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: theme.textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: GoogleFonts.inter(
-                          color: theme.disabledColor,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: theme.disabledColor,
-                ),
-              ],
-            ),
-          ),
+    );
+  }
+
+  void _showWallpaperDialog(ThemeData theme) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Choose Wallpaper'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+             ListTile(title: Text('Default'), onTap: () { _updateSetting('wallpaper', 'default'); Navigator.pop(ctx); }),
+             ListTile(title: Text('Dark'), onTap: () { _updateSetting('wallpaper', 'dark'); Navigator.pop(ctx); }),
+             ListTile(title: Text('Light'), onTap: () { _updateSetting('wallpaper', 'light'); Navigator.pop(ctx); }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHistoryDialog(ThemeData theme) {
+     showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Chat History'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+             ListTile(
+               leading: Icon(Icons.delete_forever, color: Colors.red),
+               title: Text('Delete All Chats'), 
+               onTap: () { Navigator.pop(ctx); _clearAllChats(); }
+             ),
+          ],
         ),
       ),
     );

@@ -548,4 +548,45 @@ class ApiService {
       return null;
     }
   }
+
+  // Archive & Backup
+  Future<bool> archiveChat(String token, String roomId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/archive/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> unarchiveChat(String token, String roomId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/unarchive/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> backupData(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/backup/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
 }

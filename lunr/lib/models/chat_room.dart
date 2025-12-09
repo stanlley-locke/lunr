@@ -131,6 +131,7 @@ class RoomMembership extends Equatable {
       'role': role,
       'joined_at': joinedAt.toIso8601String(),
       'is_muted': isMuted,
+      'is_archived': isArchived,
     };
   }
 
