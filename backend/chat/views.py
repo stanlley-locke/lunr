@@ -980,13 +980,16 @@ def create_cloud_backup(request):
     
     # Calculate size approx
     import json
-    data_json = json.dumps(backup_payload, cls=DjangoJSONEncoder)
-    size = len(data_json.encode('utf-8'))
+    # Use DjangoJSONEncoder to handle UUIDs and DateTimes
+    data_json_str = json.dumps(backup_payload, cls=DjangoJSONEncoder)
+    sanitized_data = json.loads(data_json_str)
+    
+    size = len(data_json_str.encode('utf-8'))
     
     # Save to DB
     backup = UserBackup.objects.create(
         user=user,
-        data=backup_payload,
+        data=sanitized_data,
         size_bytes=size
     )
     
