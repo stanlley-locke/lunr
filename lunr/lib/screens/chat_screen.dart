@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
@@ -22,8 +25,6 @@ class ChatScreen extends StatefulWidget {
   @override
   _ChatScreenState createState() => _ChatScreenState();
 }
-
-
 
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
@@ -49,11 +50,14 @@ class _ChatScreenState extends State<ChatScreen> {
   late Function(dynamic) _messageHandler;
   
   UserSettings? _userSettings;
+  String? _wallpaperPath;
+  Message? _replyToMessage;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadWallpaper();
     _initializeChat();
   }
 
@@ -66,6 +70,29 @@ class _ChatScreenState extends State<ChatScreen> {
           _userSettings = settings;
         });
       }
+    }
+  }
+
+  Future<void> _loadWallpaper() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _wallpaperPath = prefs.getString('chat_wallpaper_path');
+    });
+  }
+
+  Future<void> _pickAndSaveWallpaperLocally() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (image != null) {
+       final prefs = await SharedPreferences.getInstance();
+       await prefs.setString('chat_wallpaper_path', image.path);
+       setState(() {
+         _wallpaperPath = image.path;
+       });
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wallpaper updated')));
+       }
     }
   }
 
@@ -319,18 +346,42 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _showReactionPicker(String messageId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('React'),
+        content: Wrap(
+          spacing: 10,
+          children: ['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) {
+            return GestureDetector(
+              onTap: () async {
+                Navigator.pop(context);
+                final token = await _authService.getToken();
+                if (token != null) {
+                  await _apiService.addReaction(token, messageId, emoji);
+                  _loadMessages(forceRefresh: true);
+                }
+              },
+              child: Text(emoji, style: TextStyle(fontSize: 30)),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _socketService.activeRoomId = null; // Clear active room
     _socketService.leaveRoom(widget.roomId);
-    // if (this._currentUserId != null) { // ERROR: _currentUserId is not nullable int, it's late int. 
-    // Need to check if initialized or use try-catch
+    
        try {
          _socketService.offMessage(_messageHandler);
        } catch (e) {
          // Handler might not have been assigned if init failed
        }
-    // }
+    
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -409,10 +460,14 @@ class _ChatScreenState extends State<ChatScreen> {
         token,
         widget.roomId,
         messageText,
+        replyTo: _replyToMessage?.id,
       );
       
       if (message != null && mounted) {
         _messageController.clear();
+        setState(() {
+          _replyToMessage = null;
+        });
         // We rely on the socket to receive the message back and add it to the list
       }
     }
@@ -486,7 +541,28 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           )
         : AppBar(
-            title: Text(widget.roomName),
+            title: Row(
+              children: [
+                if (_chatRoom != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                      backgroundImage: ApiService.getImageUrl(_chatRoom?.getAvatarUrl(_currentUserId)) != null
+                          ? NetworkImage(ApiService.getImageUrl(_chatRoom!.getAvatarUrl(_currentUserId))!)
+                          : null,
+                      child: ApiService.getImageUrl(_chatRoom?.getAvatarUrl(_currentUserId)) == null
+                          ? Text(
+                              widget.roomName.isNotEmpty ? widget.roomName[0].toUpperCase() : '?',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                            )
+                          : null,
+                    ),
+                  ),
+                Expanded(child: Text(widget.roomName)),
+              ],
+            ),
             actions: [
               if (_chatRoom?.isGroup == true)
                 IconButton(
@@ -496,16 +572,31 @@ class _ChatScreenState extends State<ChatScreen> {
                     height: 24,
                   ),
                   onPressed: _showGroupMenu,
-                )
+                ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert),
+                onSelected: (value) {
+                  if (value == 'wallpaper') {
+                    _pickAndSaveWallpaperLocally();
+                  }
+                },
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem(value: 'wallpaper', child: Text('Set Wallpaper')),
+                  ];
+                },
+              ),
             ],
           ),
       body: Container(
         decoration: BoxDecoration(
-          color: _userSettings?.wallpaper == 'dark' 
-              ? Colors.grey[900] 
-              : _userSettings?.wallpaper == 'light' 
-                  ? Colors.grey[200] 
-                  : null,
+          color: Colors.grey[200],
+          image: _wallpaperPath != null
+              ? DecorationImage(
+                  image: FileImage(File(_wallpaperPath!)),
+                  fit: BoxFit.cover,
+                )
+              : null,
         ),
         child: Column(
           children: [
@@ -525,30 +616,93 @@ class _ChatScreenState extends State<ChatScreen> {
                             final isOwn = message.sender.id == _currentUserId;
                             final isSelected = _selectedMessageIds.contains(message.id);
                             
-                            return GestureDetector(
-                              onLongPress: () {
-                                _toggleSelection(message.id);
+                            return Dismissible(
+                              key: Key(message.id),
+                              direction: DismissDirection.startToEnd,
+                              background: Container(
+                                alignment: Alignment.centerLeft,
+                                padding: EdgeInsets.only(left: 20),
+                                color: Colors.transparent,
+                                child: Icon(Icons.reply, color: Theme.of(context).primaryColor),
+                              ),
+                              confirmDismiss: (direction) async {
+                                setState(() {
+                                  _replyToMessage = message;
+                                });
+                                return false; 
                               },
-                              onTap: () {
-                                if (_isSelectionMode) {
+                              child: GestureDetector(
+                                onLongPress: () {
                                   _toggleSelection(message.id);
-                                }
-                              },
-                              child: Container(
-                                color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
-                                padding: EdgeInsets.all(8),
-                                alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+                                },
+                                onDoubleTap: () {
+                                  _showReactionPicker(message.id);
+                                },
+                                onTap: () {
+                                  if (_isSelectionMode) {
+                                    _toggleSelection(message.id);
+                                  }
+                                },
                                 child: Container(
-                                  padding: EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isOwn ? Colors.blue : Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    message.content,
-                                    style: TextStyle(
-                                      color: isOwn ? Colors.white : Colors.black,
-                                    ),
+                                  color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                                  padding: EdgeInsets.all(8),
+                                  alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+                                  child: Column(
+                                    crossAxisAlignment: isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isOwn ? Colors.blue : Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                message.content,
+                                                style: TextStyle(
+                                                  color: isOwn ? Colors.white : Colors.black,
+                                                ),
+                                              ),
+                                              if (isOwn)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 4),
+                                                  child: Icon(
+                                                    (message.readBy.any((u) => u['id'] != _currentUserId))
+                                                        ? Icons.done_all 
+                                                        : Icons.check,
+                                                    size: 16,
+                                                    color: (message.readBy.any((u) => u['id'] != _currentUserId))
+                                                        ? Colors.lightBlueAccent 
+                                                        : Colors.white70,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                      ),
+                                      if (message.reactions.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 4),
+                                          child: Wrap(
+                                            spacing: 4,
+                                            children: message.reactions.entries.map((entry) {
+                                              return Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  border: Border.all(color: Colors.grey[300]!),
+                                                ),
+                                                child: Text(
+                                                  '${entry.key} ${entry.value.length}',
+                                                  style: TextStyle(fontSize: 12),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -558,29 +712,64 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
           ),
           if (!_isSelectionMode)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
+            Column(
+              children: [
+                if (_replyToMessage != null)
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    color: Colors.grey[100],
+                    child: Row(
+                      children: [
+                        Icon(Icons.reply, color: Theme.of(context).primaryColor),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Replying to ${_replyToMessage!.sender.username}',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
+                              ),
+                              Text(
+                                _replyToMessage!.content,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close),
+                          onPressed: () => setState(() => _replyToMessage = null),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _isSending ? null : _sendMessage,
-                    child: _isSending 
-                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-                        : Icon(Icons.send, size: 20),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            border: OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _isSending ? null : _sendMessage,
+                        child: _isSending 
+                            ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                            : Icon(Icons.send, size: 20),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
         ],
         ),

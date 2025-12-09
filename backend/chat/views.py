@@ -3,7 +3,7 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.db.models import Q, Count, Prefetch
@@ -408,6 +408,7 @@ def add_reaction(request, message_id):
 # Settings Views
 @api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
+@parser_classes([JSONParser, MultiPartParser, FormParser])
 def user_settings(request):
     settings, created = UserSettings.objects.get_or_create(user=request.user)
     
@@ -1077,3 +1078,19 @@ def delete_cloud_backup(request, backup_id):
         return Response({'message': 'Backup deleted'})
     except UserBackup.DoesNotExist:
         return Response({'error': 'Backup not found'}, status=404)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_archive(request, room_id):
+    try:
+        room = ChatRoom.objects.get(id=room_id)
+        membership = RoomMembership.objects.get(user=request.user, room=room)
+        membership.is_archived = not membership.is_archived
+        membership.save()
+        return Response({
+            'status': 'success',
+            'is_archived': membership.is_archived,
+            'message': 'Chat archived' if membership.is_archived else 'Chat unarchived'
+        })
+    except (ChatRoom.DoesNotExist, RoomMembership.DoesNotExist):
+        return Response({'error': 'Chat not found'}, status=404)

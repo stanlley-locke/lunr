@@ -158,6 +158,7 @@ class UserSettings(models.Model):
     # Chat settings
     auto_download_media = models.BooleanField(default=True)
     backup_enabled = models.BooleanField(default=False)
+    wallpaper = models.ImageField(upload_to='wallpapers/', null=True, blank=True)
     
     # App settings
     theme = models.CharField(max_length=10, choices=[('light', 'Light'), ('dark', 'Dark')], default='light')

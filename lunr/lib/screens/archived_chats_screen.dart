@@ -51,11 +51,7 @@ class _ArchivedChatsScreenState extends State<ArchivedChatsScreen> {
   Future<void> _unarchiveChat(String roomId) async {
     final token = await _authService.getToken();
     if (token != null) {
-      // Create unarchive method in ApiService if exists, or use generic update
-      // Assuming 'unarchive' endpoint exists as per previous plan
-      // Or simply toggle logic
-      // For now, let's assume we call specific endpoint
-       final success = await _apiService.unarchiveChat(token, roomId);
+       final success = await _apiService.toggleArchive(token, roomId);
        if (success) {
          _loadArchivedChats();
          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Chat unarchived')));

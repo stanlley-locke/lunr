@@ -248,10 +248,10 @@ class _MainScreenState extends State<MainScreen> {
                   child: CircleAvatar(
                     radius: 32,
                     backgroundColor: theme.scaffoldBackgroundColor,
-                    backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
-                      ? NetworkImage(_currentUser!.avatar!) 
+                    backgroundImage: ApiService.getImageUrl(_currentUser?.avatar) != null
+                      ? NetworkImage(ApiService.getImageUrl(_currentUser!.avatar)!)
                       : null,
-                    child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http')) 
+                    child: ApiService.getImageUrl(_currentUser?.avatar) == null
                       ? Text(
                           (_currentUser?.username ?? 'U')[0].toUpperCase(),
                           style: GoogleFonts.outfit(

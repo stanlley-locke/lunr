@@ -317,23 +317,23 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         ),
                       ],
                     ),
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundColor: theme.primaryColor.withOpacity(0.1),
-                      backgroundImage: (_currentUser?.avatar != null && _currentUser!.avatar!.startsWith('http')) 
-                        ? NetworkImage(_currentUser!.avatar!) 
-                        : null,
-                      child: (_currentUser?.avatar == null || !_currentUser!.avatar!.startsWith('http')) 
-                        ? Text(
-                            (_currentUser?.username ?? 'U')[0].toUpperCase(),
-                            style: GoogleFonts.outfit(
-                              color: theme.primaryColor,
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : null,
-                    ),
+                  child: CircleAvatar(
+                    radius: 60,
+                    backgroundColor: theme.primaryColor.withOpacity(0.1),
+                    backgroundImage: ApiService.getImageUrl(_currentUser?.avatar) != null
+                      ? NetworkImage(ApiService.getImageUrl(_currentUser!.avatar)!)
+                      : null,
+                    child: ApiService.getImageUrl(_currentUser?.avatar) == null
+                      ? Text(
+                          (_currentUser?.username ?? 'U')[0].toUpperCase(),
+                          style: GoogleFonts.outfit(
+                            color: theme.primaryColor,
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                  ),
                   ),
                   Positioned(
                     bottom: 0,

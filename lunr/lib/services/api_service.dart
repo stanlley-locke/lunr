@@ -11,6 +11,20 @@ import '../models/contact.dart';
 class ApiService {
   static final String _baseUrl = dotenv.env['BASE_URL'] ?? 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev/api';
 
+  static String? getImageUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http')) return path;
+    
+    // Remove /api suffix from base URL to get root
+    final root = _baseUrl.replaceAll('/api', '');
+    
+    // Ensure path starts with / if root doesn't end with it (or vice versa)
+    if (!path.startsWith('/')) {
+      return '$root/$path';
+    }
+    return '$root$path';
+  }
+
   // Authentication
   Future<User?> register(String username, String password) async {
     try {
@@ -443,6 +457,21 @@ class ApiService {
     }
   }
 
+  Future<bool> updateWallpaper(String token, File imageFile) async {
+    try {
+      final request = http.MultipartRequest('PUT', Uri.parse('$_baseUrl/settings/'));
+      request.headers['Authorization'] = 'Bearer $token';
+      
+      final file = await http.MultipartFile.fromPath('wallpaper', imageFile.path);
+      request.files.add(file);
+      
+      final response = await request.send();
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
 
 
   Future<Map<String, dynamic>?> backupData(String token, {List<String>? include}) async {
@@ -526,6 +555,18 @@ class ApiService {
     try {
       final response = await http.delete(
         Uri.parse('$_baseUrl/cloud/backups/$backupId/delete/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> toggleArchive(String token, String roomId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/archive/'),
         headers: {'Authorization': 'Bearer $token'},
       );
       return response.statusCode == 200;

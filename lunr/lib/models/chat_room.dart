@@ -55,27 +55,49 @@ class ChatRoom extends Equatable {
   bool get isGroup => roomType == 'group';
   bool get isDirect => roomType == 'direct';
   
-  // Deprecated: use getDisplayName
+  // Backwards compatibility for code that doesn't have userId yet
+  // This might return a suboptimal name for direct chats
   String get displayName {
     if (isGroup) return name.isNotEmpty ? name : 'Group Chat';
     if (members.isNotEmpty) {
+      // Just pick the first other member? Or just the first member?
+      // Without userId, we can't know who is "other".
+      // We'll return the name of the first member.
       return members.first.user.username;
     }
     return 'Chat';
   }
 
   String getDisplayName(int currentUserId) {
-    if (isGroup) return name.isNotEmpty ? name : 'Group Chat';
-    
-    // For direct chat, find the OTHER user
-    if (members.isNotEmpty) {
+    if (isGroup) {
+      return name.isNotEmpty ? name : 'Group Chat';
+    } else {
       final otherMember = members.firstWhere(
         (m) => m.user.id != currentUserId,
-        orElse: () => members.first,
+        orElse: () => members.isNotEmpty ? members.first : RoomMembership(
+          user: User(id: 0, username: 'Unknown', onlineStatus: false),
+          role: 'member',
+          joinedAt: DateTime.now(),
+        ),
       );
       return otherMember.user.username;
     }
-    return 'Chat';
+  }
+
+  String? getAvatarUrl(int currentUserId) {
+    if (isGroup) {
+      return avatar;
+    } else {
+      final otherMember = members.firstWhere(
+        (m) => m.user.id != currentUserId,
+        orElse: () => members.isNotEmpty ? members.first : RoomMembership(
+          user: User(id: 0, username: 'Unknown', onlineStatus: false),
+          role: 'member',
+          joinedAt: DateTime.now(),
+        ),
+      );
+      return otherMember.user.avatar;
+    }
   }
 
   bool isArchivedFor(int userId) {
@@ -120,8 +142,6 @@ class RoomMembership extends Equatable {
     );
   }
 
-  bool get isAdmin => role == 'admin';
-
   Map<String, dynamic> toJson() {
     return {
       'user': user.toJson(),
@@ -132,7 +152,6 @@ class RoomMembership extends Equatable {
     };
   }
 
-
   @override
-  List<Object?> get props => [user, role, joinedAt, isMuted];
+  List<Object?> get props => [user, role, joinedAt, isMuted, isArchived];
 }

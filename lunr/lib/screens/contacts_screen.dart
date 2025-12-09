@@ -382,14 +382,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: theme.primaryColor.withOpacity(0.1),
-                  child: Text(
-                    displayName[0].toUpperCase(),
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
-                    ),
-                  ),
+                  backgroundImage: ApiService.getImageUrl(contact.user.avatar) != null
+                      ? NetworkImage(ApiService.getImageUrl(contact.user.avatar)!)
+                      : null,
+                  child: ApiService.getImageUrl(contact.user.avatar) == null
+                      ? Text(
+                          displayName[0].toUpperCase(),
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: theme.primaryColor,
+                          ),
+                        )
+                      : null,
                 ),
                 SizedBox(width: 16),
                 Expanded(

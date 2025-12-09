@@ -424,6 +424,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  Future<bool> _archiveChat(String roomId) async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      final success = await _apiService.toggleArchive(token, roomId);
+      if (success) {
+        setState(() {
+          _rooms.removeWhere((room) => room.id == roomId);
+          _filterRooms();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Chat archived')),
+        );
+        return true;
+      }
+    }
+    return false;
+  }
+
   Widget _buildChatTile(ChatRoom room, ThemeData theme, bool isSelected) {
     // Determine dynamic title
     // Determine dynamic title
@@ -438,145 +456,168 @@ class _ChatListScreenState extends State<ChatListScreen> {
     // Safety check for empty name
     if (title.isEmpty) title = 'Chat';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isSelected ? theme.primaryColor.withOpacity(0.1) : theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: isSelected ? Border.all(color: theme.primaryColor, width: 2) : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+    String? avatarUrl;
+    if (_currentUserId != null) {
+      avatarUrl = ApiService.getImageUrl(room.getAvatarUrl(_currentUserId!));
+    }
+
+    return Dismissible(
+      key: Key('chat_room_${room.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.only(right: 20),
+        color: Colors.blueGrey,
+        child: Icon(Icons.archive, color: Colors.white, size: 30),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+      confirmDismiss: (direction) async {
+        return await _archiveChat(room.id);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? theme.primaryColor.withOpacity(0.1) : theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          onLongPress: () {
-            _toggleSelection(room.id);
-          },
-          onTap: () {
-            if (_isSelectionMode) {
+          border: isSelected ? Border.all(color: theme.primaryColor, width: 2) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onLongPress: () {
               _toggleSelection(room.id);
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatScreen(
-                    roomId: room.id,
-                    roomName: title,
-                  ),
-                ),
-              ).then((_) => _loadContacts());
-            }
-          },
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: theme.primaryColor.withOpacity(0.1),
-                      child: Text(
-                        title.isNotEmpty ? title[0].toUpperCase() : '?',
-                        style: GoogleFonts.outfit(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: theme.primaryColor,
-                        ),
-                      ),
+            },
+            onTap: () {
+              if (_isSelectionMode) {
+                _toggleSelection(room.id);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      roomId: room.id,
+                      roomName: title,
                     ),
-                    if (isSelected)
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: CircleAvatar(
-                          radius: 10,
-                          backgroundColor: theme.primaryColor,
-                          child: Icon(Icons.check, size: 12, color: Colors.white),
-                        ),
-                      ),
-                  ],
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                ).then((_) => _loadContacts());
+              }
+            },
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Stack(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: theme.textTheme.bodyLarge?.color,
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: theme.primaryColor.withOpacity(0.1),
+                        backgroundImage: avatarUrl != null 
+                          ? NetworkImage(avatarUrl) 
+                          : null,
+                        child: avatarUrl == null 
+                          ? Text(
+                              title.isNotEmpty ? title[0].toUpperCase() : '?',
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                room.lastMessage != null 
-                                  ? DateFormat('h:mm a').format(room.lastMessage!.timestamp.toLocal())
-                                  : '',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: theme.disabledColor,
-                                ),
-                              ),
-                              if (room.unreadCount > 0) ...[
-                                SizedBox(height: 4),
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: theme.primaryColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '${room.unreadCount}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
+                            )
+                          : null,
                       ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              room.lastMessage?.content ?? 'No messages yet',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: theme.textTheme.bodyMedium?.color,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      if (isSelected)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: CircleAvatar(
+                            radius: 10,
+                            backgroundColor: theme.primaryColor,
+                            child: Icon(Icons.check, size: 12, color: Colors.white),
                           ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
-                ),
-              ],
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.textTheme.bodyLarge?.color,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  room.lastMessage != null 
+                                    ? DateFormat('h:mm a').format(room.lastMessage!.timestamp.toLocal())
+                                    : '',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: theme.disabledColor,
+                                  ),
+                                ),
+                                if (room.unreadCount > 0) ...[
+                                  SizedBox(height: 4),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: theme.primaryColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${room.unreadCount}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                room.lastMessage?.content ?? 'No messages yet',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: theme.textTheme.bodyMedium?.color,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

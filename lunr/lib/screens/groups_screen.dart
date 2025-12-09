@@ -93,7 +93,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Group Options'),
-        content: Text('Do you want to ${actionText.toLowerCase()} "${group.displayName}"?'),
+        content: Text('Do you want to ${actionText.toLowerCase()} "${group.getDisplayName(_currentUserId ?? 0)}"?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
           TextButton(
@@ -272,7 +272,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
               MaterialPageRoute(
                 builder: (_) => ChatScreen(
                   roomId: group.id,
-                  roomName: group.displayName,
+                  roomName: group.getDisplayName(_currentUserId ?? 0),
                 ),
               ),
             );
@@ -320,7 +320,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 ),
                 Spacer(),
                 Text(
-                  group.displayName,
+                  group.getDisplayName(_currentUserId ?? 0),
                   style: GoogleFonts.outfit(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

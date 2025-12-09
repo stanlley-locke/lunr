@@ -161,7 +161,7 @@ class MessageSerializer(serializers.ModelSerializer):
     
     def get_read_by(self, obj):
         reads = MessageRead.objects.filter(message=obj).select_related('user')
-        return [{'user': read.user.username, 'read_at': read.read_at} for read in reads]
+        return [{'id': read.user.id, 'user': read.user.username, 'read_at': read.read_at} for read in reads]
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -191,8 +191,16 @@ class UserSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'push_notifications', 'message_notifications', 'group_notifications',
             'sound_enabled', 'vibration_enabled', 'auto_download_media',
-            'backup_enabled', 'theme', 'language'
+            'backup_enabled', 'wallpaper', 'theme', 'language'
         ]
+        
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.wallpaper:
+            request = self.context.get('request')
+            if request:
+                ret['wallpaper'] = request.build_absolute_uri(instance.wallpaper.url)
+        return ret
 
 class UpdateSerializer(serializers.ModelSerializer):
     class Meta:
