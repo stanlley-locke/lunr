@@ -781,7 +781,73 @@ def change_password(request):
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
-def delete_account(request):
-    user = request.user
-    user.delete()
     return Response({'message': 'Account deleted successfully'})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def backup_data(request):
+    user = request.user
+    
+    # Profile
+    profile_data = UserSerializer(user).data
+    
+    # Contacts
+    contacts = Contact.objects.filter(user=user)
+    contacts_data = ContactSerializer(contacts, many=True).data
+    
+    # Settings
+    try:
+        settings = UserSettings.objects.get(user=user)
+        settings_data = UserSettingsSerializer(settings).data
+    except UserSettings.DoesNotExist:
+        settings_data = {}
+        
+    # Rooms & Messages
+    memberships = RoomMembership.objects.filter(user=user)
+    rooms_data = []
+    
+    for membership in memberships:
+        room = membership.room
+        messages = Message.objects.filter(room=room)
+        
+        room_data = ChatRoomSerializer(room).data
+        # Add messages manually or nested if your serializer supports it
+        # Simple export structure
+        room_export = {
+            'room': room_data,
+            'messages': MessageSerializer(messages, many=True).data
+        }
+        rooms_data.append(room_export)
+        
+    backup_payload = {
+        'timestamp': timezone.now().isoformat(),
+        'user_id': user.id,
+        'profile': profile_data,
+        'contacts': contacts_data,
+        'settings': settings_data,
+        'chat_rooms': rooms_data
+    }
+    
+    return Response(backup_payload)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def archive_chat(request, room_id):
+    try:
+        membership = RoomMembership.objects.get(user=request.user, room__id=room_id)
+        membership.is_archived = True
+        membership.save()
+        return Response({'message': 'Chat archived'})
+    except RoomMembership.DoesNotExist:
+        return Response({'error': 'Membership not found'}, status=404)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def unarchive_chat(request, room_id):
+    try:
+        membership = RoomMembership.objects.get(user=request.user, room__id=room_id)
+        membership.is_archived = False
+        membership.save()
+        return Response({'message': 'Chat unarchived'})
+    except RoomMembership.DoesNotExist:
+        return Response({'error': 'Membership not found'}, status=404)
