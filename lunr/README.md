@@ -1,16 +1,21 @@
-# lunr
+# Lunr Mobile App
 
-A new Flutter project.
+The Flutter frontend for Lunr, designed with a premium UI and real-time chat capabilities.
 
-## Getting Started
+## Quick Start
+1.  **Install Flutter**
+    Ensure you have Flutter 3.x installed.
+2.  **Get Dependencies**
+    ```bash
+    flutter pub get
+    ```
+3.  **Run App**
+    ```bash
+    flutter run
+    ```
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Documentation
+Comprehensive technical documentation is available in the `docs/` folder:
+- [Architecture](docs/architecture.md)
+- [Deployment Guide](docs/deployment.md)
+- [Security Audit](docs/security_audit.md)
