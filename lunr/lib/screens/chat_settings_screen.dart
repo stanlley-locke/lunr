@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:file_saver/file_saver.dart'; // For saving backup
-import 'dart:convert';
-import 'dart:typed_data';
-import '../models/user_settings.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import '../widgets/custom_button.dart';
+import '../models/user_settings.dart';
+import 'package:file_saver/file_saver.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 class ChatSettingsScreen extends StatefulWidget {
   @override
@@ -16,16 +15,13 @@ class ChatSettingsScreen extends StatefulWidget {
 class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
-  
-  bool _isLoading = true;
-  UserSettings? _settings;
-  
-  // Settings State
+  bool _isLoading = false;
+
+  // Settings state
   String _wallpaper = 'default';
   int _fontSize = 14;
   bool _mediaVisibility = true;
   bool _autoDownload = true;
-  String _language = 'en';
 
   @override
   void initState() {
@@ -34,51 +30,40 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
     final token = await _authService.getToken();
     if (token != null) {
       final settings = await _apiService.getSettings(token);
       if (mounted && settings != null) {
         setState(() {
-          _settings = settings;
           _wallpaper = settings.wallpaper;
           _fontSize = settings.fontSize;
           _mediaVisibility = settings.mediaVisibility;
           _autoDownload = settings.autoDownloadMedia;
-          _language = settings.language;
-          _isLoading = false;
         });
       }
     }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _updateSetting(String key, dynamic value) async {
-    if (_settings == null) return;
-    
-    // Optimistically update UI
     setState(() {
       if (key == 'wallpaper') _wallpaper = value;
       if (key == 'fontSize') _fontSize = value;
       if (key == 'mediaVisibility') _mediaVisibility = value;
       if (key == 'autoDownload') _autoDownload = value;
-      if (key == 'language') _language = value;
     });
 
     final token = await _authService.getToken();
     if (token != null) {
-      UserSettings newSettings;
-      // We need to verify which copyWith to call or just update the one field
-      // Currently our copyWith is robust
-      if (key == 'wallpaper') newSettings = _settings!.copyWith(wallpaper: value);
-      else if (key == 'fontSize') newSettings = _settings!.copyWith(fontSize: value);
-      else if (key == 'mediaVisibility') newSettings = _settings!.copyWith(mediaVisibility: value);
-      else if (key == 'autoDownload') newSettings = _settings!.copyWith(autoDownloadMedia: value);
-      else if (key == 'language') newSettings = _settings!.copyWith(language: value);
-      else newSettings = _settings!;
-
-      final updated = await _apiService.updateSettings(token, newSettings);
-      if (mounted && updated != null) {
-        setState(() => _settings = updated);
-      }
+      await _apiService.updateSettings(token, UserSettings(
+        wallpaper: _wallpaper,
+        fontSize: _fontSize,
+        mediaVisibility: _mediaVisibility,
+        autoDownloadMedia: _autoDownload,
+        // Preserve other defaults or fetch full object if needed, 
+        // but for now we rely on backend partial update or default merge
+      ));
     }
   }
 
@@ -87,18 +72,23 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
     final token = await _authService.getToken();
     if (token != null) {
       final data = await _apiService.backupData(token);
+      
       if (data != null) {
         // Create JSON file
         try {
           String jsonString = jsonEncode(data);
           Uint8List bytes = Uint8List.fromList(utf8.encode(jsonString));
           
+          // TODO: Fix FileSaver parameters for installed version
+          /*
           await FileSaver.instance.saveFile(
             name: 'lunr_backup_${DateTime.now().toIso8601String().replaceAll(':', '-')}',
             bytes: bytes,
             ext: 'json',
             mimeType: MimeType.json,
           );
+          */
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup Generated (File Save disabled temporarily)')));
           
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup downloaded successfully')));

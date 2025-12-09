@@ -12,19 +12,6 @@ class ChatRoom extends Equatable {
   final int maxMembers;
   final DateTime createdAt;
   final List<RoomMembership> members;
-
-  // Helper to check if the current user has archived this chat
-  // Requires passing current userId because ChatRoom doesn't know "who" is viewing it
-  bool isArchivedFor(int userId) {
-    if (members.isEmpty) return false;
-    try {
-      final membership = members.firstWhere((m) => m.user.id == userId);
-      return membership.isArchived;
-    } catch (e) {
-      return false;
-    }
-  }
-
   final int memberCount;
   final int unreadCount;
   final Message? lastMessage;
@@ -89,6 +76,16 @@ class ChatRoom extends Equatable {
       return otherMember.user.username;
     }
     return 'Chat';
+  }
+
+  bool isArchivedFor(int userId) {
+    if (members.isEmpty) return false;
+    try {
+      final membership = members.firstWhere((m) => m.user.id == userId);
+      return membership.isArchived;
+    } catch (e) {
+      return false;
+    }
   }
 
   @override

@@ -1,5 +1,7 @@
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'auth_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -22,15 +24,16 @@ class SocketService {
     if (token == null) return;
 
     // Base URL without /api
-    const String socketUrl = 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev';
+    final socketUrl = dotenv.env['SOCKET_URL'] ?? 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev';
 
-    _socket = IO.io(socketUrl, IO.OptionBuilder()
-      .setTransports(['websocket'])
-      .disableAutoConnect()
-      .setPath('/socket.io/')
-      .setQuery({'token': token})
-      .build()
-    );
+    _socket = IO.io(
+        socketUrl,
+        IO.OptionBuilder()
+            .setTransports(['websocket'])
+            .disableAutoConnect()
+            .setPath('/socket.io/')
+            .setQuery({'token': token})
+            .build());
 
     _socket.connect();
 
@@ -67,7 +70,7 @@ class SocketService {
   void onMessage(Function(dynamic) callback) {
     _socket.on('message', callback);
   }
-  
+
   void offMessage(Function(dynamic) callback) {
     _socket.off('message', callback);
   }

@@ -7,9 +7,6 @@ class UserSettings extends Equatable {
   final bool soundEnabled;
   final bool vibrationEnabled;
   final bool autoDownloadMedia;
-  final bool mediaVisibility;
-  final String wallpaper;
-  final int fontSize;
   final bool backupEnabled;
   final String theme;
   final String language;
@@ -21,13 +18,17 @@ class UserSettings extends Equatable {
     this.soundEnabled = true,
     this.vibrationEnabled = true,
     this.autoDownloadMedia = true,
-    this.mediaVisibility = true,
-    this.wallpaper = 'default',
-    this.fontSize = 14,
     this.backupEnabled = false,
     this.theme = 'light',
     this.language = 'en',
+    this.wallpaper = 'default',
+    this.fontSize = 14,
+    this.mediaVisibility = true,
   });
+
+  final String wallpaper;
+  final int fontSize;
+  final bool mediaVisibility;
 
   factory UserSettings.fromJson(Map<String, dynamic> json) {
     return UserSettings(
@@ -37,12 +38,12 @@ class UserSettings extends Equatable {
       soundEnabled: json['sound_enabled'] ?? true,
       vibrationEnabled: json['vibration_enabled'] ?? true,
       autoDownloadMedia: json['auto_download_media'] ?? true,
-      mediaVisibility: json['media_visibility'] ?? true,
-      wallpaper: json['wallpaper'] ?? 'default',
-      fontSize: json['font_size'] ?? 14,
       backupEnabled: json['backup_enabled'] ?? false,
       theme: json['theme'] ?? 'light',
       language: json['language'] ?? 'en',
+      wallpaper: json['wallpaper'] ?? 'default',
+      fontSize: json['font_size'] ?? 14,
+      mediaVisibility: json['media_visibility'] ?? true,
     );
   }
 
@@ -54,9 +55,6 @@ class UserSettings extends Equatable {
       'sound_enabled': soundEnabled,
       'vibration_enabled': vibrationEnabled,
       'auto_download_media': autoDownloadMedia,
-      'media_visibility': mediaVisibility,
-      'wallpaper': wallpaper,
-      'font_size': fontSize,
       'backup_enabled': backupEnabled,
       'theme': theme,
       'language': language,
@@ -70,9 +68,6 @@ class UserSettings extends Equatable {
     bool? soundEnabled,
     bool? vibrationEnabled,
     bool? autoDownloadMedia,
-    bool? mediaVisibility,
-    String? wallpaper,
-    int? fontSize,
     bool? backupEnabled,
     String? theme,
     String? language,
@@ -84,9 +79,6 @@ class UserSettings extends Equatable {
       soundEnabled: soundEnabled ?? this.soundEnabled,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
       autoDownloadMedia: autoDownloadMedia ?? this.autoDownloadMedia,
-      mediaVisibility: mediaVisibility ?? this.mediaVisibility,
-      wallpaper: wallpaper ?? this.wallpaper,
-      fontSize: fontSize ?? this.fontSize,
       backupEnabled: backupEnabled ?? this.backupEnabled,
       theme: theme ?? this.theme,
       language: language ?? this.language,
@@ -98,7 +90,7 @@ class UserSettings extends Equatable {
   @override
   List<Object?> get props => [
     pushNotifications, messageNotifications, groupNotifications,
-    soundEnabled, vibrationEnabled, autoDownloadMedia, mediaVisibility,
-    wallpaper, fontSize, backupEnabled, theme, language
+    soundEnabled, vibrationEnabled, autoDownloadMedia,
+    backupEnabled, theme, language
   ];
 }

@@ -28,10 +28,7 @@ from .views import (
     updates, tools, report_user,
     
     # Media
-    FileUploadView,
-    
-    # Archive & Backup
-    archive_chat, unarchive_chat, backup_data
+    FileUploadView
 )
 
 urlpatterns = [
@@ -81,9 +78,4 @@ urlpatterns = [
     
     # Media
     path('upload/', FileUploadView.as_view(), name='file_upload'),
-    
-    # Archive & Backup
-    path('rooms/<uuid:room_id>/archive/', archive_chat, name='archive_chat'),
-    path('rooms/<uuid:room_id>/unarchive/', unarchive_chat, name='unarchive_chat'),
-    path('backup/', backup_data, name='backup_data'),
 ]

@@ -6,8 +6,8 @@ import '../services/socket_service.dart';
 import '../models/message.dart';
 import '../models/chat_room.dart';
 import '../models/contact.dart';
-import '../services/database_service.dart';
 import '../models/user_settings.dart';
+import '../services/database_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String roomId;
@@ -53,8 +53,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeChat();
     _loadSettings();
+    _initializeChat();
   }
 
   Future<void> _loadSettings() async {
@@ -62,7 +62,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (token != null) {
       final settings = await _apiService.getSettings(token);
       if (mounted && settings != null) {
-        setState(() => _userSettings = settings);
+        setState(() {
+          _userSettings = settings;
+        });
       }
     }
   }
@@ -71,8 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final userId = await _authService.getUserId();
     if (userId != null) {
       _currentUserId = userId;
-      
-      // Fetch Room Details
+
       final room = await _apiService.getChatRoom(await _authService.getToken() ?? '', widget.roomId);
       if (mounted) setState(() => _chatRoom = room);
 
@@ -498,9 +499,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 )
             ],
           ),
-      body: Column(
-        children: [
-          Expanded(
+      body: Container(
+        decoration: BoxDecoration(
+          color: _userSettings?.wallpaper == 'dark' 
+              ? Colors.grey[900] 
+              : _userSettings?.wallpaper == 'light' 
+                  ? Colors.grey[200] 
+                  : null,
+        ),
+        child: Column(
+          children: [
+            Expanded(
             child: _isLoading
                 ? Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
@@ -572,7 +581,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ],
               ),
-            ),
             ),
         ],
         ),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/user.dart';
 import '../models/chat_room.dart';
 import '../models/message.dart';
@@ -8,7 +9,7 @@ import '../models/user_settings.dart';
 import '../models/contact.dart';
 
 class ApiService {
-  static const String _baseUrl = 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev/api';
+  static final String _baseUrl = dotenv.env['BASE_URL'] ?? 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev/api';
 
   // Authentication
   Future<User?> register(String username, String password) async {
@@ -241,6 +242,30 @@ class ApiService {
     }
   }
 
+  Future<bool> archiveChat(String token, String roomId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/archive/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> unarchiveChat(String token, String roomId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rooms/$roomId/unarchive/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<bool> markChatRead(String token, String roomId) async {
     try {
       final response = await http.post(
@@ -420,6 +445,22 @@ class ApiService {
 
 
 
+  Future<Map<String, dynamic>?> backupData(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/chat/backup/'), // Verify URL structure relative to views
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // App Features
   Future<List<dynamic>> getUpdates(String token) async {
     try {
@@ -545,47 +586,6 @@ class ApiService {
       }
     } catch (e) {
       print('Upload error: $e');
-      return null;
-    }
-  }
-
-  // Archive & Backup
-  Future<bool> archiveChat(String token, String roomId) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/rooms/$roomId/archive/'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<bool> unarchiveChat(String token, String roomId) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/rooms/$roomId/unarchive/'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<Map<String, dynamic>?> backupData(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/backup/'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
-      return null;
-    } catch (e) {
       return null;
     }
   }
