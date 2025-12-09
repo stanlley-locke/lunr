@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'backup_restore_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../models/user_settings.dart';
@@ -68,40 +69,10 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
   }
 
   Future<void> _backupChats() async {
-    setState(() => _isLoading = true);
-    final token = await _authService.getToken();
-    if (token != null) {
-      final data = await _apiService.backupData(token);
-      
-      if (data != null) {
-        // Create JSON file
-        try {
-          String jsonString = jsonEncode(data);
-          Uint8List bytes = Uint8List.fromList(utf8.encode(jsonString));
-          
-          // TODO: Fix FileSaver parameters for installed version
-          /*
-          await FileSaver.instance.saveFile(
-            name: 'lunr_backup_${DateTime.now().toIso8601String().replaceAll(':', '-')}',
-            bytes: bytes,
-            ext: 'json',
-            mimeType: MimeType.json,
-          );
-          */
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup Generated (File Save disabled temporarily)')));
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup downloaded successfully')));
-          }
-        } catch (e) {
-          print("Backup save error: $e");
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save backup file')));
-        }
-      } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to generate backup')));
-      }
-    }
-    if (mounted) setState(() => _isLoading = false);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BackupRestoreScreen()),
+    );
   }
 
   Future<void> _clearAllChats() async {

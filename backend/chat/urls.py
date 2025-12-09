@@ -31,7 +31,7 @@ from .views import (
     FileUploadView,
     
     # Backup & Archive
-    backup_data, archive_chat, unarchive_chat
+    backup_data, restore_data, archive_chat, unarchive_chat
 )
 
 urlpatterns = [
@@ -84,6 +84,7 @@ urlpatterns = [
 
     # Backup & Restore
     path('chat/backup/', backup_data, name='backup_data'),
+    path('chat/restore/', restore_data, name='restore_data'),
 
     # Archiving
     path('rooms/<uuid:room_id>/archive/', archive_chat, name='archive_chat'),

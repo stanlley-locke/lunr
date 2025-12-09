@@ -788,50 +788,137 @@ def delete_account(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def backup_data(request):
     user = request.user
+    include = request.query_params.get('include', 'all').split(',')
     
-    # Profile
-    profile_data = UserSerializer(user).data
-    
-    # Contacts
-    contacts = Contact.objects.filter(user=user)
-    contacts_data = ContactSerializer(contacts, many=True).data
-    
-    # Settings
-    try:
-        settings = UserSettings.objects.get(user=user)
-        settings_data = UserSettingsSerializer(settings).data
-    except UserSettings.DoesNotExist:
-        settings_data = {}
-        
-    # Rooms & Messages
-    memberships = RoomMembership.objects.filter(user=user)
-    rooms_data = []
-    
-    for membership in memberships:
-        room = membership.room
-        messages = Message.objects.filter(room=room)
-        
-        room_data = ChatRoomSerializer(room).data
-        # Add messages manually or nested if your serializer supports it
-        # Simple export structure
-        room_export = {
-            'room': room_data,
-            'messages': MessageSerializer(messages, many=True).data
-        }
-        rooms_data.append(room_export)
-        
     backup_payload = {
         'timestamp': timezone.now().isoformat(),
         'user_id': user.id,
-        'profile': profile_data,
-        'contacts': contacts_data,
-        'settings': settings_data,
-        'chat_rooms': rooms_data
     }
+
+    if 'all' in include or 'profile' in include:
+        backup_payload['profile'] = UserSerializer(user).data
+    
+    if 'all' in include or 'contacts' in include:
+        contacts = Contact.objects.filter(user=user)
+        backup_payload['contacts'] = ContactSerializer(contacts, many=True).data
+    
+    if 'all' in include or 'settings' in include:
+        try:
+            settings = UserSettings.objects.get(user=user)
+            backup_payload['settings'] = UserSettingsSerializer(settings).data
+        except UserSettings.DoesNotExist:
+            backup_payload['settings'] = {}
+            
+    if 'all' in include or 'chats' in include:
+        memberships = RoomMembership.objects.filter(user=user)
+        rooms_data = []
+        for membership in memberships:
+            room = membership.room
+            messages = Message.objects.filter(room=room)
+            rooms_data.append({
+                'room': ChatRoomSerializer(room).data,
+                'messages': MessageSerializer(messages, many=True).data
+            })
+        backup_payload['chat_rooms'] = rooms_data
     
     return Response(backup_payload)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def restore_data(request):
+    user = request.user
+    data = request.data
+    
+    try:
+        # Restore Profile
+        if 'profile' in data and data['profile']:
+            serializer = UserSerializer(user, data=data['profile'], partial=True)
+            if serializer.is_valid():
+                serializer.save()
+
+        # Restore Settings
+        if 'settings' in data and data['settings']:
+            UserSettings.objects.update_or_create(
+                user=user,
+                defaults=data['settings']
+            )
+
+        # Restore Contacts
+        if 'contacts' in data and isinstance(data['contacts'], list):
+            for contact_data in data['contacts']:
+                # Assumption: ContactSerializer handles creation or we do it manually check
+                # For simplicity, we skip if alias/username exists or just create
+                # We need to find valid user for the contact
+                contact_user_data = contact_data.get('contact_user')
+                if contact_user_data:
+                    try:
+                        contact_user = User.objects.get(username=contact_user_data.get('username'))
+                        Contact.objects.get_or_create(
+                            user=user,
+                            contact_user=contact_user,
+                            defaults={'alias': contact_data.get('alias', '')}
+                        )
+                    except User.DoesNotExist:
+                        continue 
+
+        # Restore Chats
+        if 'chat_rooms' in data and isinstance(data['chat_rooms'], list):
+            for room_export in data['chat_rooms']:
+                room_data = room_export.get('room')
+                messages_data = room_export.get('messages', [])
+                
+                if room_data:
+                    # Get or Create Room
+                    room, created = ChatRoom.objects.get_or_create(
+                        id=room_data.get('id'),
+                        defaults={
+                            'name': room_data.get('name', ''),
+                            'room_type': room_data.get('room_type', 'direct'),
+                            'description': room_data.get('description', ''),
+                        }
+                    )
+                    
+                    # Ensure Membership
+                    RoomMembership.objects.get_or_create(
+                        user=user,
+                        room=room,
+                        defaults={'role': 'admin' if created else 'member'}
+                    )
+                    
+                    # Messages
+                    for msg_data in messages_data:
+                        # We try to keep original ID if possible, or mapping might be needed
+                        # For backup/restore, keeping IDs is ideal but dangerous if conflicts.
+                        # We use update_or_create with ID
+                        try:
+                            sender_id = msg_data.get('sender')
+                            if isinstance(sender_id, dict): sender_id = sender_id.get('id')
+                            
+                            # Valid sender check? If sender doesn't exist locally?
+                            # If sender is self, use request.user. If other, might fail if user missing DB.
+                            # We'll skip messages from unknown users for safety or assign system?
+                            
+                            Message.objects.update_or_create(
+                                id=msg_data.get('id'),
+                                defaults={
+                                    'room': room,
+                                    'sender_id': sender_id, 
+                                    'content': msg_data.get('content', ''),
+                                    'timestamp': msg_data.get('timestamp'),
+                                    'message_type': msg_data.get('message_type', 'text')
+                                }
+                            )
+                        except Exception as e:
+                            print(f"Error restoring message: {e}")
+                            continue
+
+        return Response({'message': 'Restore completed successfully'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

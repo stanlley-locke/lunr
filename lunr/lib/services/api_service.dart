@@ -445,10 +445,15 @@ class ApiService {
 
 
 
-  Future<Map<String, dynamic>?> backupData(String token) async {
+  Future<Map<String, dynamic>?> backupData(String token, {List<String>? include}) async {
     try {
+      String query = '';
+      if (include != null && include.isNotEmpty) {
+        query = '?include=${include.join(',')}';
+      }
+      
       final response = await http.get(
-        Uri.parse('$_baseUrl/chat/backup/'), // Verify URL structure relative to views
+        Uri.parse('$_baseUrl/chat/backup/$query'),
         headers: {'Authorization': 'Bearer $token'},
       );
       
@@ -458,6 +463,22 @@ class ApiService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+  
+  Future<bool> restoreData(String token, Map<String, dynamic> data) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/chat/restore/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json'
+        },
+        body: jsonEncode(data),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 
