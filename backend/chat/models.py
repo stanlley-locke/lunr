@@ -54,6 +54,7 @@ class RoomMembership(models.Model):
     role = models.CharField(max_length=10, choices=ROLES, default='member')
     joined_at = models.DateTimeField(auto_now_add=True)
     is_muted = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False)
     last_read_message = models.ForeignKey('Message', null=True, blank=True, on_delete=models.SET_NULL)
     
     class Meta:
@@ -157,6 +158,9 @@ class UserSettings(models.Model):
     
     # Chat settings
     auto_download_media = models.BooleanField(default=True)
+    media_visibility = models.BooleanField(default=True)
+    wallpaper = models.CharField(max_length=100, default='default')
+    font_size = models.IntegerField(default=14)
     backup_enabled = models.BooleanField(default=False)
     
     # App settings

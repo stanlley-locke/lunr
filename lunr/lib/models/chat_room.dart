@@ -12,6 +12,19 @@ class ChatRoom extends Equatable {
   final int maxMembers;
   final DateTime createdAt;
   final List<RoomMembership> members;
+
+  // Helper to check if the current user has archived this chat
+  // Requires passing current userId because ChatRoom doesn't know "who" is viewing it
+  bool isArchivedFor(int userId) {
+    if (members.isEmpty) return false;
+    try {
+      final membership = members.firstWhere((m) => m.user.id == userId);
+      return membership.isArchived;
+    } catch (e) {
+      return false;
+    }
+  }
+
   final int memberCount;
   final int unreadCount;
   final Message? lastMessage;
@@ -90,12 +103,14 @@ class RoomMembership extends Equatable {
   final String role;
   final DateTime joinedAt;
   final bool isMuted;
+  final bool isArchived;
 
   const RoomMembership({
     required this.user,
     this.role = 'member',
     required this.joinedAt,
     this.isMuted = false,
+    this.isArchived = false,
   });
 
   factory RoomMembership.fromJson(Map<String, dynamic> json) {
@@ -104,6 +119,7 @@ class RoomMembership extends Equatable {
       role: json['role'] ?? 'member',
       joinedAt: DateTime.parse(json['joined_at']),
       isMuted: json['is_muted'] ?? false,
+      isArchived: json['is_archived'] ?? false,
     );
   }
 
