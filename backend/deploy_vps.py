@@ -4,11 +4,13 @@ import subprocess
 import sys
 
 # Configuration
-REPO_URL = "https://github.com/stanlley-locke/lunr.git"  # Update this
+REPO_URL = "https://github.com/stanlley-locke/lunr.git"
 PROJECT_DIR = "/opt/lunr"
 BACKEND_DIR = os.path.join(PROJECT_DIR, "backend")
-VENV_DIR = os.path.join(PROJECT_DIR, "venv")
-DOMAIN = "your-domain.com"  # Update this
+VENV_DIR = os.path.join(PROJECT_DIR, ".venv")
+
+# Use "_" as a wildcard to accept all connections (IP-based access)
+DOMAIN = "_"
 USER = "root"
 
 def run_command(command):
@@ -62,29 +64,73 @@ WantedBy=multi-user.target
     run_command("systemctl start gunicorn")
     run_command("systemctl enable gunicorn")
 
+def configure_daphne():
+    print("Configuring Daphne (WebSockets)...")
+    service_content = f"""
+[Unit]
+Description=daphne daemon (WebSockets)
+After=network.target
+
+[Service]
+User={USER}
+Group=www-data
+WorkingDirectory={BACKEND_DIR}
+ExecStart={VENV_DIR}/bin/daphne -b 0.0.0.0 -p 8001 core.asgi:application
+
+[Install]
+WantedBy=multi-user.target
+    """
+    with open("/etc/systemd/system/daphne.service", "w") as f:
+        f.write(service_content)
+
+    run_command("systemctl start daphne")
+    run_command("systemctl enable daphne")
+
 def configure_nginx():
     print("Configuring Nginx...")
+    # Use "default" as filename for IP-based catch-all
+    site_name = "default"
+    
     nginx_config = f"""
 server {{
-    listen 80;
-    server_name {DOMAIN};
+    listen 80 default_server;
+    server_name _;
 
     location = /favicon.ico {{ access_log off; log_not_found off; }}
+    
     location /static/ {{
         root {BACKEND_DIR};
     }}
 
+    location /media/ {{
+        root {BACKEND_DIR};
+    }}
+
+    # WebSocket Proxy
+    location /ws/ {{
+        proxy_pass http://0.0.0.0:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_redirect off;
+    }}
+
+    # HTTP/REST API Proxy
     location / {{
         include proxy_params;
         proxy_pass http://unix:/run/gunicorn.sock;
     }}
 }}
     """
-    with open(f"/etc/nginx/sites-available/{DOMAIN}", "w") as f:
+    with open(f"/etc/nginx/sites-available/{site_name}", "w") as f:
         f.write(nginx_config)
 
-    if not os.path.exists(f"/etc/nginx/sites-enabled/{DOMAIN}"):
-        run_command(f"ln -s /etc/nginx/sites-available/{DOMAIN} /etc/nginx/sites-enabled")
+    # Remove default Nginx welcome page if it exists
+    if os.path.exists("/etc/nginx/sites-enabled/default"):
+        os.remove("/etc/nginx/sites-enabled/default")
+
+    if not os.path.exists(f"/etc/nginx/sites-enabled/{site_name}"):
+        run_command(f"ln -s /etc/nginx/sites-available/{site_name} /etc/nginx/sites-enabled")
     
     run_command("nginx -t")
     run_command("systemctl restart nginx")
@@ -98,13 +144,14 @@ def main():
     setup_project()
     configure_database()
     configure_gunicorn()
+    configure_daphne()
     configure_nginx()
     
     print("Deployment Setup Complete!")
     print("Next Steps:")
     print("1. Update .env file in backend directory")
     print("2. Run migrations: ./venv/bin/python manage.py migrate")
-    print("3. Set up SSL with Cerbot")
+    print(f"3. Your app should be accessible at http://<your-ip>/")
 
 if __name__ == "__main__":
     main()
