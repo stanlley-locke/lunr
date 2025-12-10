@@ -9,7 +9,7 @@ import '../models/user_settings.dart';
 import '../models/contact.dart';
 
 class ApiService {
-  static final String _baseUrl = dotenv.env['BASE_URL'] ?? 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev/api';
+  static final String _baseUrl = dotenv.env['BASE_URL'] ?? 'http://194.36.88.236/api';
 
   static String? getImageUrl(String? path) {
     if (path == null || path.isEmpty) return null;
@@ -40,6 +40,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
+      print('Register Error: $e');
       return null;
     }
   }
@@ -57,6 +58,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
+      print('Login Error: $e');
       return null;
     }
   }

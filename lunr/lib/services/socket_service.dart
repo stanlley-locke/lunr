@@ -24,7 +24,7 @@ class SocketService {
     if (token == null) return;
 
     // Base URL without /api
-    final socketUrl = dotenv.env['SOCKET_URL'] ?? 'https://humble-sniffle-wr46p9pq554crp5-8000.app.github.dev';
+    final socketUrl = dotenv.env['SOCKET_URL'] ?? 'http://194.36.88.236';
 
     _socket = IO.io(
         socketUrl,
