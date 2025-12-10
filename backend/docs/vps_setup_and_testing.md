@@ -77,19 +77,30 @@ systemctl restart nginx
 
 ## Part 2: Testing with cURL
 
-Replace `http://localhost:8000` with `http://your-server-ip` or `https://your-domain.com`.
+### Important: Port Usage
+- **Production (Nginx)**: Use **Port 80** (e.g., `http://194.36.88.236/api/...`). Nginx forwards requests to the backend.
+- **Debug (Runserver)**: If you manually run `python manage.py runserver`, it defaults to `127.0.0.1` (localhost only). To access it remotely, you MUST use `0.0.0.0`:
+  ```bash
+  python manage.py runserver 0.0.0.0:8000
+  ```
+  *(Make sure Port 8000 is allowed in your VPS Firewall)*
 
 ### 1. Health Check (List Rooms)
-Try to access a protected endpoint without a token (should fail):
+Try to access a protected endpoint.
+**Using Nginx (Recommended)**:
 ```bash
-curl -v http://localhost:8000/api/rooms/
+curl -v http://<your-ip>/api/rooms/
+```
+**Using Manual Runserver**:
+```bash
+curl -v http://<your-ip>:8000/api/rooms/
 ```
 *Expected: `401 Unauthorized`*
 
 ### 2. Register a User
-Create a new account:
+Create a new account (Example using Nginx/Port 80):
 ```bash
-curl -X POST http://localhost:8000/api/auth/register/ \
+curl -X POST http://<your-ip>/api/auth/register/ \
      -H "Content-Type: application/json" \
      -d '{"username": "testuser", "password": "password123"}'
 ```
@@ -98,7 +109,7 @@ curl -X POST http://localhost:8000/api/auth/register/ \
 ### 3. Login
 Get an access token:
 ```bash
-curl -X POST http://localhost:8000/api/auth/login/ \
+curl -X POST http://<your-ip>/api/auth/login/ \
      -H "Content-Type: application/json" \
      -d '{"username": "testuser", "password": "password123"}'
 ```

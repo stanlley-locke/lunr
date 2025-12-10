@@ -9,11 +9,10 @@ from django.utils import timezone
 from django.db.models import Q, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from .models import User, ChatRoom, RoomMembership, Message, Contact, UserSettings, Notification, UserBackup, MessageRead
-from .serializers import (
     UserSerializer, ChatRoomSerializer, MessageSerializer, 
     ContactSerializer, UserSettingsSerializer, NotificationSerializer,
     RoomMembershipSerializer, UserBackupSerializer, UserBlockSerializer, UserReportSerializer, UserProfileSerializer,
-    MediaSerializer
+    MediaSerializer, RegisterSerializer
 )
 import socketio
 import json
