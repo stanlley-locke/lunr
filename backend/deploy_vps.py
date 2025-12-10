@@ -106,7 +106,16 @@ server {{
         root {BACKEND_DIR};
     }}
 
-    # WebSocket Proxy
+    # Socket.IO Proxy (for Flutter/JS clients using socket.io-client)
+    location /socket.io/ {{
+        proxy_pass http://0.0.0.0:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_redirect off;
+    }}
+
+    # WebSocket Proxy (for native Django Channels)
     location /ws/ {{
         proxy_pass http://0.0.0.0:8001;
         proxy_http_version 1.1;
